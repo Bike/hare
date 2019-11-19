@@ -40,8 +40,6 @@
 ;;; Because I don't think it's possible to indicate in C, lambda initializers
 ;;; are currently only valid at top level. FIXME.
 ;;; Array initializers, including bytes, are not implemented. FIXME.
-;;; Constant references not implemented because circularity and early
-;;; definitions need to be dealt with. FIXME.
 ;;;
 ;;; NOTE: The array (not arrayn), bytes, and lambda initializer types kind
 ;;; of imply some accessible storage when used other than a defvar.
@@ -96,8 +94,7 @@
     ((integer 0) (make-instance 'integer-initializer :value literal))
     ((or (cons (member array arrayn bytes lambda)) (eql undef))
      (error "Found initializer in literal context: ~a" literal))
-    (symbol (error "Constants not implemented yet")
-     #+(or)(find-constant literal env))
+    (symbol (lookup literal env))
     (cons ; constructor
      (let* ((constructor (car literal)) (fields (cdr literal))
             (def (find-adt-def constructor adt-env)))
@@ -110,8 +107,7 @@
   (etypecase initializer
     ((integer 0) (make-instance 'integer-initializer :value initializer))
     ((eql undef) (undef))
-    (symbol (error "Constants not implemented yet")
-     #+(or)(find-constant initializer env))
+    (symbol (lookup initializer env))
     ((cons (eql lambda))
      (parse-lambda (cadr initializer) (cddr initializer)
                    env adt-env))

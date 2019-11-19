@@ -30,7 +30,7 @@ available. MAKE-ADT-ENV makes an empty environment and ADD-ADT-DEF modifies one.
   (let ((pair (assoc name (bindings environment) :test #'eq)))
     (if pair
         (cdr pair)
-        (error "Unbound variable: ~a" name))))
+        (error 'variable-unbound :name name))))
 
 (defun make-env (variables values &optional parent)
   (let ((parent-bindings (if parent (bindings parent) nil)))

@@ -296,8 +296,8 @@ available; their values as integers are not defined.
 ;;;
 ;;; Parsing types.
 
-;;; Environments are alists (name . type).
-;;; ADT environments are alists (name . adt-def).
+;;; "Environments" are alists (symbol . type).
+;;; ADT environments are as in env.lisp.
 (defun parse-type (expr env adt-env)
   (etypecase expr
     (symbol ; must be an alias.
@@ -305,10 +305,7 @@ available; their values as integers are not defined.
        (if pair
            (cdr pair)
            ;; "foo" can be short for "(foo)"
-           (let ((pair (assoc expr adt-env)))
-             (if pair
-                 (make-adt (cdr pair) nil)
-                 (error "Unknown type ~s" expr))))))
+           (make-adt (find-adt-def expr adt-env) nil))))
     (cons
      (cl:case (car expr)
        ((int)
@@ -326,9 +323,6 @@ available; their values as integers are not defined.
           (make-fun ret (loop for param in params
                               collect (parse-type param env adt-env)))))
        (otherwise
-        (let ((pair (assoc (car expr) adt-env)))
-          (if pair
-              (make-adt (cdr pair)
-                        (loop for type in (cdr expr)
-                              collect (parse-type type env adt-env)))
-              (error "Unknown type ~s" expr))))))))
+        (make-adt (find-adt-def (car expr) adt-env)
+                  (loop for type in (cdr expr)
+                        collect (parse-type type env adt-env))))))))
