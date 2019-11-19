@@ -9,6 +9,7 @@ Grammar
 
 In flux.
 
+```
 module := definition*
 definition := defconstant | defvar | defadt
 type := tvar | (INT integer) | (POINTER type) | (FUNCTION type type*) | (ARRAY type) |
@@ -31,6 +32,7 @@ combination := (LET (name form) form*) | (IF form form form) | (SEQ form*) |
                (WITH (name [initializer]) form*) |
                call
 call := (form form*)
+```
 
 See literals.lisp, types.lisp, and ast.lisp for explanations of the literal/initializer, type, and evaluation semantics respectively.
 
