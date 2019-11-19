@@ -1,6 +1,6 @@
 (in-package #:hare)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Type inference
 ;;; A type environment is an alist (variable . schema)
@@ -41,7 +41,7 @@
   (schema type (set-difference (free type) (free-in-tenv tenv)
                                :test #'eq)))
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Unification
 ;;;
@@ -109,18 +109,68 @@
             do (setf subst (compose-subst (unify/2 type1 type2) subst))
             finally (return subst))))
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Initializer types
+;;; Because of variable initializers, this depends on the type environment.
+;;; FIXME: Probably can cache everything else though.
+;;;
+
+(defgeneric initializer-type (initializer tenv))
+
+(defmethod initializer-type ((initializer integer-initializer) tenv)
+  (declare (ignore tenv))
+  ;; Must be an integer type, but we can't express that in the type system.
+  (make-tvar '#:integer))
+
+(defmethod initializer-type ((initializer variable-initializer) tenv)
+  (instantiate (lookup-type (variable initializer) tenv)))
+
+(defmethod initializer-type ((initializer constructor-initializer) tenv)
+  (let ((def (adt-def initializer)) (constructor (constructor initializer))
+        (fields (fields initializer)))
+    (multiple-value-bind (members type) (instantiate-adt-def def)
+      (let* ((member (or (assoc constructor members)
+                         (error "BUG: ADT mismatch")))
+             (args (adt-args type))
+             (field-types (loop for field in fields
+                                collect (initializer-type field tenv)))
+             (subst (unify-pairwise member field-types)))
+        (subst-type subst type)))))
+
+(defmethod initializer-type ((initializer undef-initializer) tenv)
+  (declare (ignore tenv))
+  ;; undef can be anything.
+  (make-tvar '#:any))
+
+(defmethod initializer-type ((initializer lambda-initializer) tenv)
+  (declare (ignore tenv))
+  ;; Make a fresh, generic function type.
+  ;; Technically we could infer the body but like nah. Recursive functions
+  ;; exist, crazily enough.
+  (make-fun (make-tvar '#:ret) (loop for param in (params initializer)
+                                     collect (make-tvar (name param)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Main event
+;;;
 
 (defgeneric infer (ast tenv))
 
 (defmethod infer ((ast reference) tenv)
-  (values (lookup-type (variable ast) env) (empty-subst)))
+  (values (instantiate (lookup-type (variable ast) env)) (empty-subst)))
+
+(defmethod infer ((ast literal) tenv)
+  (values (initializer-type (initializer ast) tenv) (empty-subst)))
+
 (defmethod infer ((ast seq) tenv)
   ;; FIXME: Unify the discarded values with Unit. (and define Unit.)
   (let ((ignored (butlast (asts ast)))
         (final (first (last (asts ast)))))
     (unless (null ignored) (error "whoops not implemented"))
     (infer final tenv)))
+
 (defmethod infer ((ast branch) tenv)
   (multiple-value-bind (testt testsubst)
       (infer (test ast) tenv)
@@ -134,6 +184,7 @@
                   (compose-substs
                    resultsubst testsubst2
                    elsesubst thensubst testsubst)))))))
+
 (defmethod infer ((ast bind) tenv)
   (multiple-value-bind (valt valsubst) (infer (value ast) tenv)
     (let* ((new-env (subst-tenv valsubst tenv))
@@ -141,9 +192,10 @@
       (multiple-value-bind (bodyt bodysubst)
           (infer (body ast) (extend-tenv (var ast) valsc new-env))
         (values bodyt (compose-subst valsubst bodysubst))))))
+
 (defmethod infer ((ast with) tenv)
   ;; Basically like BIND/LET, except we use the initializer's type.
-  (let* ((type (initializer-type (initializer ast)))
+  (let* ((type (initializer-type (initializer ast) tenv))
          ;; This'll force unification with (pointer tvar) as we want.
          ;; (I mean, assuming the body uses the thing.)
          (tptr (make-pointer tvar))
@@ -151,6 +203,7 @@
          (sc (generalize tenv tptr))
          (new-env (extend-tenv (variable ast) sc env)))
     (infer (body ast) new-env)))
+
 (defmethod infer ((ast case) tenv)
   ;; I'm pretty unsure about a lot of this.
   ;; Particularly, which inferences need to keep up previous envs,
@@ -171,6 +224,8 @@
           (loop with case-types = nil
                 with ret-subst = valsubst ; subst we'll return
                 for member in members
+                ;; case bindings are not polymorphic.
+                ;; not 100% sure that's correct though.
                 for schemata = (mapcar #'schema member)
                 for constructor in constructors
                 for ((case-cons . variables) . ast) in (cases ast)
@@ -188,6 +243,7 @@
                      ;; Unify all the case types, and return the accumulated
                      ;; subst.
                      (values (apply #'unify case-types) ret-subst))))))))
+
 (defmethod infer ((ast call) tenv)
   (multiple-value-bind (funt funsubst) (infer (callee ast) tenv)
     (let ((tenv (subst-tenv funsubst tenv)))

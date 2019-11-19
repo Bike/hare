@@ -236,7 +236,7 @@ available; their values as integers are not defined.
 ;;; This is like instantiating a schema, below.
 ;;; It makes a fresh type variable for each variable bound in the def,
 ;;; substitutes them into the members, and then returns those.
-;;; As a second value it returns the instantiated ast.
+;;; As a second value it returns the instantiated adt.
 ;;; That is, it returns a list of lists of types.
 (defun instantiate-adt-def (adt-def)
   (let* ((old (tvars adt-def))
