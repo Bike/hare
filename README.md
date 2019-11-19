@@ -1,4 +1,4 @@
-A programming language. It is not usable yet.
+A programming language. It doesn't work yet.
 
 The premise is a language with a Hindley-Milner type system (constructors, polytypes, inference) suitable for standalone programs. So like ML if ML was uninteractive and involved a lot more pointer arithmetic.
 
@@ -50,3 +50,24 @@ Phase 2 essentially strips out defconstant and defadt forms, at least to the poi
 Text format is not really specified so far. I would especially like to be able to produce an object file without any actual starting text, i.e. producing in-memory AST structures by whatever means. Text is not really an efficient way to deal with programs, and also I don't want to deal with encodings very much.
 
 Macros I haven't thought too much about. Ideally they would be in a more abstract language. Might be good to add another phase for removing any macro definitions written in some other language, so the compiler can focus.
+
+To-do list
+----------
+
+Ideally it should work.
+
+Also, add:
+
+1. extern declarations: this pointer will be linked in and have this type
+2. compiler hints concerning functions, such as: inline
+3. hints concerning variables, such as: restrict?
+3. hints concerning representation of types, such as: tagged pointers, alignment, packing
+4. ABI definition
+5. atomic operations
+6. continuations
+
+Things I would like to work:
+
+1. the language
+2. (defadt immediate (o) (fixnum (int 64)) (object (pointer o))) = tagged pointer
+3. (defadt object () (object (array byte) header)) = pointers to objects are pointers to the bytes, since they're more often used, and the machine subtracts to get the header
