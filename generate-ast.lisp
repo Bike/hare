@@ -5,9 +5,7 @@
 ;;; Parse forms
 ;;;
 
-;;; env is an alist (symbol . local). Globals should NOT be included.
-;;; adt-env is the same alist (name . adt-def) as in parse-type.
-;;; Should we really handle case like this? I'm not sure.
+;;; FIXME: Should we really handle case like this? I'm not sure.
 (defun parse-form (form env adt-env)
   (flet ((parse-seq (list env)
            (make-instance 'seq
@@ -15,11 +13,13 @@
                          collect (parse-form form env adt-env))))
          (local (name)
            (check-type name symbol)
-           (make-instance 'local :name name)))
+           (make-instance 'variable :name name)))
     (etypecase form
       (symbol
-       (or (cdr (assoc form env :test #'eq))
-           (make-instance 'global :name form)))
+       (let ((thing (lookup form env)))
+         (etypecase thing
+           (variable (make-instance 'reference :variable thing))
+           (initializer (make-instance 'literal :initializer thing)))))
       (cons
        (let ((head (car form)) (args (cdr form)))
          (cl:case head
@@ -37,11 +37,15 @@
                 :then (parse-form then env adt-env)
                 :else (parse-form else env adt-env))))
            ((with)
-            (destructuring-bind ((var) &rest body) args
+            (destructuring-bind ((var &optional (initializer (undef)))
+                                 &rest body)
+                args
               (let ((lvar (local var)))
                 (make-instance 'with
-                  :var lvar :len nil
-                  :body (parse-seq body (acons var lvar env))))))
+                  :var lvar :initializer initializer
+                  :body (parse-seq
+                         body (make-env (list var) (list lvar) env))))))
+           #+(or)
            ((with-array)
             (destructuring-bind ((var len) &rest body) args
               (let ((lvar (local var)))
@@ -50,41 +54,46 @@
                   :body (parse-seq body (acons var lvar env))))))
            ((case case!)
             (destructuring-bind (value &rest cases) args
+              (when (null cases)
+                (error "Empty case"))
               (multiple-value-bind (def cases)
-                  (find-adt-def cases adt-env)
+                  (case-adt-def cases adt-env)
                 (let ((cases
                         (loop for ((constructor . vars) . body) in cases
                               for lvars = (mapcar #'local vars)
-                              for env = (mapcar #'cons vars lvars)
+                              for new-env = (make-env vars lvars env)
                               collect (cons (cons constructor lvars)
-                                            (parse-seq body env)))))
+                                            (parse-seq body new-env)))))
                   (make-instance 'case
                     :value (parse-form value env adt-env)
                     :cases cases
                     :case!p (eq head 'case!)
                     :adt-def def)))))
+           ((quote)
+            (destructuring-bind (spec) args
+              (make-instance 'literal
+                :initializer (parse-literal spec env adt-env))))
            (otherwise ; call
             (make-instance 'call
               :callee (parse-form head env adt-env)
               :args (loop for form in args
                           collect (parse-form form env adt-env)))))))
       ;; Back to the typecase - remember that? So long ago
-      ((and (integer 0) fixnum)
-       (make-instance 'numeric-literal :value form)))))
+      (t
+       (make-instance 'literal
+         :initializer (parse-literal form env adt-env))))))
 
 ;;; Given the ((constructor var*) . ast)* list from a case,
 ;;; return the appropriate adt def, and order the cases to match the def.
-(defun find-adt-def (cases env)
+(defun find-adt-def (cases adt-env)
   (let* ((constructors (mapcar #'caar cases))
-         (def (loop for (ignore . def) in env
-                    for oconstructors = (constructors def)
-                    ;; when (set-equal constructors oconstructors)
-                    when (null (set-exclusive-or constructors oconstructors
-                                                 :test #'eq))
-                      return def
-                    finally (error 'case-unknown :constructors constructors))))
+         (def (find-adt-def-from-constructor (first constructors) adt-env))
+         (oconstructors (constructors def)))
+    (unless (null (set-exclusive-or constructors oconstructors :test #'eq))
+      ;; FIXME: improve message
+      (error "Case mismatch ~a ~a" constructors oconstructors))
     (values def
             ;; Rearrange the cases.
-            (loop for oconstructor in (constructors def)
+            (loop for oconstructor in oconstructors
                   collect (find oconstructor cases
                                 :key #'caar :test #'eq)))))

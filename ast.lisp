@@ -14,23 +14,23 @@ A form is either
       evalaute to a pointer to an ADT. The vars are bound to pointers
       to the constructor fields. The ADT may be sized or unsized.
       Passing a pointer in to case! counts as dereferencing it.
-   ** (with (var) form*) allocates a value on the stack.
+   ** (with (var [initializer]) form*) allocates a value on the stack.
       The variable named symbol is bound to a pointer to a value of
-       the inferred type, which must be sized.
-      If the pointer is dereferenced after the with form,
+       the inferred type. If this type is unsized, an initializer must
+       be provided so the compiler can determine a size.
+      If there is no initializer and the pointer is dereferenced before
+       a value is stored in it, the consequences are undefined.
+      If the pointer is dereferenced after the with form exits,
        the consequences are undefined.
    ** (with-array (var n) form*) allocates an array of values on
        the stack. n is an integer-typed form, or an integer literal.
       The type of the variable must be inferred to be an unsized type,
        and more specifically, either an array or an unsized ADT.
       In the latter case n is used recursively with that member.
+      NOTE: Not implemented yet.
    ** otherwise, a function call. The callee must be a function pointer
        with types matching the arguments.
- * A literal
-   ** An integer. This has polymorphic type, e.g. 4 could be of
-      any (int n) for n >= 3. Negatives illegal for now.
-   ** A constructed literal: (constructor literal*)
-      Also polymorphic.
+ * A literal (see literals.lisp)
 
 FIXME: No way to initialize an unsized adt. It can be a union! case! can't do
 shit! Bad bad. Rethink case!, to disambiguate a union it essentially has to
@@ -62,23 +62,18 @@ Forces the pointer to point to the particular constructor type, as expected.
    ;; a list of ASTs
    (%args :accessor args :initarg :args :type list)))
 
-;;; abstract
-(defclass literal (ast) ())
+;;; This is separate from the initializer, because initializers are
+;;; polymorphic. That is, they cannot have a monotype, but any particular
+;;; use of them in code can.
+(defclass literal (ast)
+  (;; This is a "literal" in literals.lisp terms, i.e. a member of
+   ;; a restricted subset of initializers.
+   (%initializer :initarg :initializer :accessor initializer
+                 :type initializer)))
 
-(defclass numeric-literal (literal)
-  ((%value :accessor numeric-literal-value :initarg :value
-           :type (or fixnum float))))
-
-#+(or)(defclass constructor-literal (ast) nil) ; later
-
-(defclass variable (ast)
-  ((%name :initarg :name :accessor name :type symbol)))
-
-;; reference to a global symbol (like a C symbol)
-(defclass global (variable) ())
-
-;; A local variable or parameter.
-(defclass local (variable) ())
+;;; Separate from variables for the same reason.
+(defclass reference (ast)
+  ((%variable :initarg :variable :accessor variable :type variable)))
 
 ;; if
 (defclass branch (ast)
@@ -88,22 +83,22 @@ Forces the pointer to point to the particular constructor type, as expected.
 
 ;; LET with one variable
 (defclass bind (ast)
-  ((%var :initarg :var :accessor var :type local)
+  ((%variable :initarg :variable :accessor variable :type variable)
    (%value :initarg :value :accessor value :type ast)
    (%body :initarg :body :accessor body :type ast)))
 
 (defclass with (ast)
-  ((%var :initarg :var :accessor var :type local)
-   ;; If NIL, this is a WITH. Otherwise, WITH-ARRAY.
-   (%len :initarg :len :accessor len :type (or ast null))
+  ((%variable :initarg :variable :accessor variable :type variable)
+   (%initializer :initarg :initializer :accessor initializer
+                 :type initializer)
    (%body :initarg :body :accessor body :type ast)))
 
 (defclass case (ast)
   ((%value :initarg :value :accessor value :type ast)
    ;; The adts this thing deconstructs.
    (%adt-def :initarg :adt-def :accessor adt-def :type adt-def)
-   ;; A list of ((symbol local*) . ast)
-   ;; Symbol is the constructor name.
+   ;; A list of ((symbol variable*) . ast),
+   ;; symbol being the constructor name.
    (%cases :initarg :cases :accessor cases :type list)
    ;; Is this case!, the pointer version?
    (%case!p :initarg :case!p :accessor case!p :type bool)))

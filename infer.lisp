@@ -7,12 +7,6 @@
 ;;; A substitution is an alist (tvar . type)
 ;;;
 
-;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Type environments (tenvs)
-;;; Alists (variable . schema)
-;;;
-
 (defun subst-tenv (subst tenv)
   (mapcar (lambda (pair)
             (cons (car pair)
@@ -119,8 +113,8 @@
 
 (defgeneric infer (ast tenv))
 
-(defmethod infer ((ast local) tenv) (lookup-type ast tenv))
-(defmethod infer ((ast global) tenv) (lookup-type ast tenv))
+(defmethod infer ((ast reference) tenv)
+  (values (lookup-type (variable ast) env) (empty-subst)))
 (defmethod infer ((ast seq) tenv)
   ;; FIXME: Unify the discarded values with Unit. (and define Unit.)
   (let ((ignored (butlast (asts ast)))
@@ -143,35 +137,20 @@
 (defmethod infer ((ast bind) tenv)
   (multiple-value-bind (valt valsubst) (infer (value ast) tenv)
     (let* ((new-env (subst-tenv valsubst tenv))
-           ;; Since there are no local functions, generalization might not
-           ;; matter here. But on the other hand if you (let (f global) ...)
-           ;; it ought to keep f polymorphic. I don't know.
            (valsc (generalize new-env valt)))
       (multiple-value-bind (bodyt bodysubst)
           (infer (body ast) (extend-tenv (var ast) valsc new-env))
         (values bodyt (compose-subst valsubst bodysubst))))))
 (defmethod infer ((ast with) tenv)
-  (let ((len (len ast)))
-    (multiple-value-bind (lent lensubst)
-        (if len
-            (infer len tenv)
-            (values nil (empty-subst)))
-      (declare (ignore lent)) ; FIXME: Assert that it's an int type
-      ;; We make and bind a new tvar/scheme for the allocated variable.
-      ;; The schema does NOT bind the tvar, because this isn't polymorphic.
-      ;; I think this makes sense.
-      (let* ((env (subst-tenv lensubst tenv))
-             (var (var ast))
-             (tvar (make-tvar (name var)))
-             (tarr (if len (make-arrayt tvar) tvar))
-             ;; This'll force unification with (pointer tvar)
-             ;; or (pointer (array tvar)) like we want.
-             ;; (I mean, assuming the body uses the thing.)
-             (tptr (make-pointer tarr))
-             (new-env (extend-tenv (var ast) (schema tptr) env)))
-        (multiple-value-bind (bodyt bodysubst)
-            (infer (body ast) new-env)
-          (values bodyt (compose-subst lensubst bodysubst)))))))
+  ;; Basically like BIND/LET, except we use the initializer's type.
+  (let* ((type (initializer-type (initializer ast)))
+         ;; This'll force unification with (pointer tvar) as we want.
+         ;; (I mean, assuming the body uses the thing.)
+         (tptr (make-pointer tvar))
+         ;; WITH is polymorphic.
+         (sc (generalize tenv tptr))
+         (new-env (extend-tenv (variable ast) sc env)))
+    (infer (body ast) new-env)))
 (defmethod infer ((ast case) tenv)
   ;; I'm pretty unsure about a lot of this.
   ;; Particularly, which inferences need to keep up previous envs,
@@ -194,9 +173,10 @@
                 for member in members
                 for schemata = (mapcar #'schema member)
                 for constructor in constructors
-                for ((case-cons . locals) . ast) in (cases ast)
-                for new-tenv = (extend-tenv-list locals schemata tenv)
+                for ((case-cons . variables) . ast) in (cases ast)
+                for new-tenv = (extend-tenv-list variables schemata tenv)
                 do ;; Make sure everything's in the right order.
+                   ;; (It should be made so in parse-form.)
                    (assert (eq case-cons constructor))
                    ;; Infer
                    (multiple-value-bind (type subst)

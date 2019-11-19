@@ -66,6 +66,10 @@
 (defclass integer-initializer (initializer)
   ((%value :accessor value :initarg :value :type (integer 0))))
 
+;;; An initializer that is a toplevel variable.
+(defclass variable-initializer (initializer)
+  ((%variable :accessor variable :initarg :variable :type variable)))
+
 (defclass constructor-initializer (initializer)
   ((%def :accessor adt-def :initarg :def :type adt-def)
    (%constructor :accessor constructor :initarg :constructor
@@ -74,6 +78,8 @@
    (%fields :accessor fields :initarg :fields :type list)))
 
 (defclass undef-initializer (initializer) ())
+
+(defun undef () (make-instance 'undef-initializer))
 
 (defclass lambda-initializer (initializer)
   (;; A list of variables.
@@ -85,45 +91,43 @@
 ;;; Parsing
 ;;;
 
-(defun parse-literal (literal constant-env adt-env)
+(defun parse-literal (literal env adt-env)
   (etypecase literal
     ((integer 0) (make-instance 'integer-initializer :value literal))
     ((or (cons (member array arrayn bytes lambda)) (eql undef))
      (error "Found initializer in literal context: ~a" literal))
     (symbol (error "Constants not implemented yet")
-     #+(or)(find-constant literal constant-env))
+     #+(or)(find-constant literal env))
     (cons ; constructor
      (let* ((constructor (car literal)) (fields (cdr literal))
             (def (find-adt-def constructor adt-env)))
        (make-instance 'constructor-initializer
          :def def :constructor constructor
          :fields (loop for field in fields
-                       collect (parse-literal field
-                                              constant-env adt-env)))))))
+                       collect (parse-literal field env adt-env)))))))
 
-(defun parse-initializer (initializer constant-env adt-env)
+(defun parse-initializer (initializer env adt-env)
   (etypecase initializer
     ((integer 0) (make-instance 'integer-initializer :value initializer))
-    ((eql undef) (make-instance 'undef-initializer))
+    ((eql undef) (undef))
     (symbol (error "Constants not implemented yet")
-     #+(or)(find-constant initializer constant-env))
+     #+(or)(find-constant initializer env))
     ((cons (eql lambda))
      (parse-lambda (cadr initializer) (cddr initializer)
-                   constant-env adt-env))
+                   env adt-env))
     ((cons (member array arrayn bytes))
      (error "Not implemented yet: ~a" (car initializer)))
     (cons ; constructor
      (let* ((constructor (car initializer)) (fields (cdr initializer))
-            (def (find-adt-def constructor adt-env)))
+            (def (find-adt-def-from-constructor constructor adt-env)))
        (make-instance 'constructor-initializer
          :def def :constructor constructor
          :fields (loop for field in fields
-                       collect (parse-initializer
-                                field constant-env adt-env)))))))
+                       collect (parse-initializer field env adt-env)))))))
 
-(defun parse-lambda (params forms constant-env adt-env)
+(defun parse-lambda (params forms env adt-env)
   (let* ((vars (mapcar #'make-variable params))
-         (env (make-env params vars)))
+         (env (make-env params vars env)))
     (make-instance 'lambda-initializer
       :params vars
-      :body (parse-form `(seq ,@forms) env constant-env adt-env))))
+      :body (parse-form `(seq ,@forms) env adt-env))))
