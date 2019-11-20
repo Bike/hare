@@ -7,7 +7,7 @@
 ;;; information.
 
 (defclass module ()
-  ((environment :initarg :environment :accessor environment :type environment)
+  ((adt-env :initarg :adt-env :accessor adt-env :type adt-env)
    ;; FIXME: Should store constants.
    ;; Also type aliases once those are implemented.
    ;; Also externs.
