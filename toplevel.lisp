@@ -1,5 +1,25 @@
 (in-package #:hare)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Modules
+;;; As described in the README, modules contain compile-time and polytyped
+;;; information.
+
+(defclass module ()
+  ((environment :initarg :environment :accessor environment :type environment)
+   ;; FIXME: Should store constants.
+   ;; Also type aliases once those are implemented.
+   ;; Also externs.
+   ;; BINDINGS is an alist from variables to initializers.
+   ;; FIXME: Could be made into an actual structure.
+   (bindings :initarg :bindings :accessor bindings :type list)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Parsing functions
+;;;
+
 (defun parse-defadt (adt-def form adt-env)
   (destructuring-bind (defadt name tvars &rest members) form
     (declare (ignore defadt name)) ; handled already
@@ -56,25 +76,41 @@
                                          (parse-defconstant form)
                                          (go try-again))))))
                               (parse-initializer init cenv adt-env))))
+                      ;; FIXME: Wasteful to not just mutate the environment
                       (setf cenv (make-env (list name) (list init) cenv)))))))
       (loop until (null defconstants)
             do (parse-defconstant (first defconstants)))
       cenv)))
 
-;;; Input is a list of (defvar name [initializer]) forms, and a list of
-;;; (defconstant name initializer) forms, and an adt-env.
-;;; Returns an alist from variable names to initializers.
-(defun parse-definitions (defvars defconstants adt-env)
-  (let* ((varnames (mapcar #'second defvars))
-         (vars (loop for name in varnames
-                     collect (make-instance 'variable :name name)))
-         (env (make-env varnames vars))
-         ;; Now that we have an environment, figure out constants.
-         (cenv (parse-defconstants
-                (copy-list defconstants) env adt-env)))
-    ;; Now we can simply...
-    (loop for (_ name . rest) in defvars
-          for init = (if (null rest)
-                         (undef)
-                         (parse-initializer (first rest) env adt-env))
-          collect (cons name init))))
+(defun make-bindings (defvars env adt-env)
+  (loop for (_ name . rest) in defvars
+        for var = (lookup name env)
+        for init = (if (null rest)
+                       (undef)
+                       (parse-initializer (first rest) env adt-env))
+        collect (cons var init)))
+
+(defun initial-defvar-env
+  (loop for (_ name) in defvars
+        collect name into names
+        collect (make-instance 'variable :name name) into vars
+        finally (return (make-env names vars))))
+
+;;; FORMS is a list of defvar, defconstant, and defadt forms.
+;;; Output is a module object.
+(defun parse-module (forms)
+  (let (defadts defvars defconstants)
+    (loop for form in forms
+          do (cl:case (car form)
+               ((defadt) (push form defadts))
+               ((defvar) (push form defvars))
+               ((defconstant) (push form defconstants))
+               (otherwise
+                (error "Unknown toplevel form: ~a" form))))
+    (let* ((adt-env (parse-defadts defadts))
+           (env (initial-defvar-env defvars))
+           (cenv (parse-defconstants defconstants env adt-env))
+           (bindings (make-bindings defvars cenv adt-env)))
+      (make-instance 'module
+                     :adt-env adt-env
+                     :bindings bindings))))
