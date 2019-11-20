@@ -97,6 +97,15 @@ available; their values as integers are not defined.
 ;;; abstract
 (defclass type () ())
 
+;;; Given a type, return a sexp representation for display.
+(defgeneric unparse-type (type))
+
+(defmethod print-object ((o type) s)
+  (print-unreadable-object (o s)
+    (write 'type :stream s)
+    (write-char #\Space s)
+    (write (unparse-type o) :stream s)))
+
 ;; Apply function to type and its component types. Return NIL.
 (defgeneric mapnil-type (function type)
   (:argument-precedence-order type function)
@@ -121,6 +130,8 @@ available; their values as integers are not defined.
 (defmethod map-type (function (type int))
   (declare (ignore function))
   type)
+(defmethod unparse-type ((type int))
+  `(int ,(int-type-length type)))
 
 ;;; pointer.
 (defclass pointer (type)
@@ -132,6 +143,8 @@ available; their values as integers are not defined.
   (make-pointer (map-type function (pointer-type-underlying type))))
 (defmethod mapnil-type (function (type pointer))
   (mapnil-type function (pointer-type-underlying type)))
+(defmethod unparse-type ((type pointer))
+  `(pointer ,(unparse-type (pointer-type-underlying type))))
 
 ;;; a function
 (defclass fun (type)
@@ -151,6 +164,9 @@ available; their values as integers are not defined.
   (mapnil-type function (fun-return type))
   (loop for param in (parameters type)
         do (mapnil-type function param)))
+(defmethod unparse-type ((type fun))
+  `(function ,(unparse-type (fun-return type))
+             ,@(mapcar #'unparse-type (params type))))
 
 (defclass arrayt (type)
   ((%element-type :initarg :et :accessor arrayt-element-type :type type)))
@@ -161,6 +177,8 @@ available; their values as integers are not defined.
   (make-arrayt (map-type function (arrayt-element-type type))))
 (defmethod mapnil-type (function (type arrayt))
   (mapnil-type function (array-element-type type)))
+(defmethod unparse-type ((type arrayt))
+  `(array ,(unparse-type (arrayt-element-type type))))
 
 ;;; Type placeholder used in a few things.
 (defclass tvar (type)
@@ -170,6 +188,7 @@ available; their values as integers are not defined.
 (defmethod map-type (function (type tvar))
   (declare (ignore function))
   type)
+(defmethod unparse-type ((type tvar)) (name type))
 
 ;;; A "subst" is an alist (tvar . type) used to describe substitutions.
 (defun empty-subst () nil)
@@ -230,6 +249,8 @@ available; their values as integers are not defined.
                   collect (map-type function ty))))
 (defmethod mapnil-type (function (type adt))
   (loop for ty in (adt-args type) do (map-type function ty)))
+(defmethod unparse-type ((type adt))
+  `(,(name (adt-def type)) ,@(mapcar #'unparse-type (adt-args type))))
 
 ;;; This is like instantiating a schema, below.
 ;;; It makes a fresh type variable for each variable bound in the def,
