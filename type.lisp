@@ -109,13 +109,13 @@ available; their values as integers are not defined.
 ;; Apply function to type and its component types. Return NIL.
 (defgeneric mapnil-type (function type)
   (:argument-precedence-order type function)
-  (:method :around (function type) (funcall function type)))
+  (:method :before (function (type type)) (funcall function type)))
 ;; Apply function to type. If it returns non-nil, return that.
 ;; Otherwise, copy type, recursively map-typing any component types.
 ;; The type doesn't need to be copied if there are no component types.
 (defgeneric map-type (function type)
   (:argument-precedence-order type function)
-  (:method :around (function type)
+  (:method :around (function (type type))
     (or (funcall function type) (call-next-method))))
 
 ;;; integer type. length is in bits.
@@ -127,6 +127,7 @@ available; their values as integers are not defined.
   (or (cached-int len)
       (setf (cached-int len) (make-instance 'int :length len))))
 (defun make-bool () (make-int 1))
+(defmethod mapnil-type (function (type it)) (declare (ignore function)))
 (defmethod map-type (function (type int))
   (declare (ignore function))
   type)
@@ -185,6 +186,7 @@ available; their values as integers are not defined.
   (;; For debugging
    (%name :initarg :name :accessor name :type symbol :initform nil)))
 (defun make-tvar (&optional name) (make-instance 'tvar :name name))
+(defmethod mapnil-type (function (type tvar)) (declare (ignore function)))
 (defmethod map-type (function (type tvar))
   (declare (ignore function))
   type)

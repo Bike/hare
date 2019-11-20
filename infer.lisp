@@ -158,6 +158,25 @@
 
 (defgeneric infer (ast tenv))
 
+;;; entry point: do inference, then recurse back through
+;;; and apply the substitution to all types.
+;;; Return the inferred type. (The subst is meaningless since the
+;;; toplevel type environment has nothing free.)
+(defun infer-ast (ast tenv)
+  (let ((subst (nth-value 1 (infer ast tenv))))
+    (mapnil-ast (lambda (ast)
+                  (setf (type ast)
+                        (subst-type subst (type ast))))
+                ast)
+    (type ast)))
+
+;;; Put the inferred type into the AST.
+(defmethod infer :around (ast tenv)
+  (multiple-value-bind (type subst)
+      (call-next-method)
+    (setf (type ast) type)
+    (values type subst)))
+
 (defmethod infer ((ast reference) tenv)
   (values (instantiate (lookup-type (variable ast) env)) (empty-subst)))
 
