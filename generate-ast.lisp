@@ -10,10 +10,7 @@
   (flet ((parse-seq (list env)
            (make-instance 'seq
              :asts (loop for form in list
-                         collect (parse-form form env adt-env))))
-         (local (name)
-           (check-type name symbol)
-           (make-instance 'variable :name name)))
+                         collect (parse-form form env adt-env)))))
     (etypecase form
       (symbol
        (let ((thing (lookup form env)))
@@ -26,7 +23,7 @@
            ((seq) (parse-seq args env))
            ((let)
             (destructuring-bind ((var value) &rest body) args
-              (let ((lvar (local var)))
+              (let ((lvar (make-variable var)))
                 (make-instance 'bind
                   :var lvar :value (parse-form value env adt-env)
                   :body (parse-seq body (acons var lvar env))))))
@@ -40,7 +37,7 @@
             (destructuring-bind ((var &optional (initializer (undef)))
                                  &rest body)
                 args
-              (let ((lvar (local var)))
+              (let ((lvar (make-variable var)))
                 (make-instance 'with
                   :var lvar :initializer initializer
                   :body (parse-seq
@@ -48,9 +45,9 @@
            #+(or)
            ((with-array)
             (destructuring-bind ((var len) &rest body) args
-              (let ((lvar (local var)))
+              (let ((lvar (make-variable var)))
                 (make-instance 'with
-                  :var (local var) :len (parse-form len env adt-env)
+                  :var (make-variable var) :len (parse-form len env adt-env)
                   :body (parse-seq body (acons var lvar env))))))
            ((case case!)
             (destructuring-bind (value &rest cases) args
@@ -60,7 +57,7 @@
                   (case-adt-def cases adt-env)
                 (let ((cases
                         (loop for ((constructor . vars) . body) in cases
-                              for lvars = (mapcar #'local vars)
+                              for lvars = (mapcar #'make-variable vars)
                               for new-env = (make-env vars lvars env)
                               collect (cons (cons constructor lvars)
                                             (parse-seq body new-env)))))
@@ -85,7 +82,7 @@
 
 ;;; Given the ((constructor var*) . ast)* list from a case,
 ;;; return the appropriate adt def, and order the cases to match the def.
-(defun find-adt-def (cases adt-env)
+(defun case-adt-def (cases adt-env)
   (let* ((constructors (mapcar #'caar cases))
          (def (find-adt-def-from-constructor (first constructors) adt-env))
          (oconstructors (constructors def)))

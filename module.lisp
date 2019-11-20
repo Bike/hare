@@ -46,7 +46,8 @@
         collect (cons def form) into todo
         do (add-adt-def def adt-env)
         finally (loop for (def . form) in todo
-                      do (parse-defadt def form adt-env))
+                      do (parse-defadt def form adt-env)
+                         (finish-adt-def def adt-env))
                 (return adt-env)))
 
 ;;; Given a list of (defconstant name initializer) forms, an env, and an

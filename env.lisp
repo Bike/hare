@@ -19,6 +19,9 @@ available. MAKE-ADT-ENV makes an empty environment and ADD-ADT-DEF modifies one.
 
 (defclass variable ()
   ((%name :accessor name :initarg :name :type symbol)))
+(defun make-variable (name)
+  (check-type name symbol)
+  (make-instance 'variable :name name))
 
 ;;; initializers are defined in literals.lisp
 
@@ -47,7 +50,7 @@ available. MAKE-ADT-ENV makes an empty environment and ADD-ADT-DEF modifies one.
   ((%by-name :initform (make-hash-table :test #'eq) :accessor by-name
              :type hash-table)
    (%by-constructor :initform (make-hash-table :test #'eq)
-                    :initarg :by-constructor :type hash-table)))
+                    :accessor by-constructor :type hash-table)))
 
 (defun find-adt-def (name adt-env)
   (or (gethash name (by-name adt-env))
@@ -55,16 +58,20 @@ available. MAKE-ADT-ENV makes an empty environment and ADD-ADT-DEF modifies one.
 
 (defun find-adt-def-from-constructor (constructor adt-env)
   (or (gethash constructor (by-constructor adt-env))
-      (error "Unknown constructor: ~a" name)))
+      (error "Unknown constructor: ~a" constructor)))
 
 (defun make-adt-env () (make-instance 'adt-env))
 
+;; Add an adt-def that may only have its name to the environment.
 (defun add-adt-def (adt-def adt-env)
   (let ((name (name adt-def)) (by-name (by-name adt-env)))
     (if (nth-value 1 (gethash name by-name))
         (error "ADT multiply defined: ~a" name)
-        (setf (gethash name by-name) adt-def)))
-  (loop with by-constructor = (by-constructor adt-def)
+        (setf (gethash name by-name) adt-def))))
+
+;;; Finish adding a now-complete adt-def to the environment.
+(defun finish-adt-def (adt-def adt-env)
+  (loop with by-constructor = (by-constructor adt-env)
         for constructor in (constructors adt-def)
         do (if (nth-value 1 (gethash constructor by-constructor))
                (error "Constructor multiply defined: ~a" constructor)
