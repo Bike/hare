@@ -42,7 +42,7 @@ Compilation semantics
 C defines things in terms of translation phases so let's do that.
 
 1. You start out with ASTs of some kind. These can be translated to a "module". A module contains polymorphic definitions, as well as things only of interest to a compiler, such as constants, macro definitions, type definitions, and extern declarations (i.e. a notice that a given name will eventually be linked in as having some type).
-2. A module can be translated into an "object", like a binary. An object does not (in general) have macro definitions or constants. Everything is monotyped. This means any given polymorphic definition has been "manifested" as one or more monomorphic definitions. Definitions are distinguished by some form of name mangling, unless I can figure out how to make a linker behave pretty damn exotically.
+2. A module can be translated into an "object", like a binary. An object does not (in general) have macro definitions or constants. Everything is monotyped. This means any given polymorphic definition has been "instantiated" as one or more monomorphic definitions. Definitions are distinguished by some form of name mangling, unless I can figure out how to make a linker behave pretty damn exotically.
 3. Objects are linked together etc. ditto C.
 
 A "module" is analogous to a C header, but it can contain structured information rather than text.
