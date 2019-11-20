@@ -23,6 +23,10 @@ available. MAKE-ADT-ENV makes an empty environment and ADD-ADT-DEF modifies one.
   (check-type name symbol)
   (make-instance 'variable :name name))
 
+(defmethod print-object ((o variable) s)
+  (print-unreadable-object (o s :type t)
+    (write (name o) :stream s)))
+
 ;;; initializers are defined in literals.lisp
 
 (defclass environment ()
