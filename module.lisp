@@ -90,7 +90,7 @@
                        (parse-initializer (first rest) env adt-env))
         collect (cons var init)))
 
-(defun initial-defvar-env
+(defun initial-defvar-env (defvars)
   (loop for (_ name) in defvars
         collect name into names
         collect (make-instance 'variable :name name) into vars

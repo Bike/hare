@@ -97,8 +97,6 @@ available; their values as integers are not defined.
 ;;; abstract
 (defclass type () ())
 
-(defgeneric sizedp (type))
-
 ;; Apply function to type and its component types. Return NIL.
 (defgeneric mapnil-type (function type)
   (:argument-precedence-order type function)

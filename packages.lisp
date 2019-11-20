@@ -1,3 +1,3 @@
 (defpackage #:hare
   (:use #:cl)
-  (:shadow #:type #:case))
+  (:shadow #:type #:case #:variable))
