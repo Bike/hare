@@ -112,8 +112,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Initializer types
-;;; Because of variable initializers, this depends on the type environment.
-;;; FIXME: Probably can cache everything else though.
+;;; This function will set up the types of any lambda initializers within,
+;;; so it serves as the actual entry point into this file.
 ;;;
 
 (defgeneric initializer-type (initializer tenv))
@@ -144,12 +144,21 @@
   (make-tvar '#:any))
 
 (defmethod initializer-type ((initializer lambda-initializer) tenv)
-  (declare (ignore tenv))
-  ;; Make a fresh, generic function type.
-  ;; Technically we could infer the body but like nah. Recursive functions
-  ;; exist, crazily enough.
-  (make-fun (make-tvar '#:ret) (loop for param in (params initializer)
-                                     collect (make-tvar (name param)))))
+  (let* ((params (params initializer))
+         (paramtvars (loop for param in params
+                           collect (make-tvar (name param))))
+         ;; Not polymorphic, as per typed lambda calculus computability
+         (paramsc (mapcar #'schema paramtvars))
+         ;; FIXME: We need to extend the GLOBAL tenv, here,
+         ;; but as-is, if we initialized a local variable with a lambda
+         ;; for some reason, inference would see local variable bindings
+         ;; even though it shouldn't.
+         (new-tenv (nconc (mapcar #'cons params paramsc) tenv)))
+    (multiple-value-bind (type subst)
+        (infer-ast (body initializer) tenv)
+      (make-fun type
+                (loop for ty in paramtvars
+                      collect (subst-type subst ty))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -160,15 +169,14 @@
 
 ;;; entry point: do inference, then recurse back through
 ;;; and apply the substitution to all types.
-;;; Return the inferred type. (The subst is meaningless since the
-;;; toplevel type environment has nothing free.)
+;;; Return the result of inference (but the type has the subst applied).
 (defun infer-ast (ast tenv)
   (let ((subst (nth-value 1 (infer ast tenv))))
     (mapnil-ast (lambda (ast)
                   (setf (type ast)
                         (subst-type subst (type ast))))
                 ast)
-    (type ast)))
+    (values (type ast) subst)))
 
 ;;; Put the inferred type into the AST.
 (defmethod infer :around (ast tenv)
@@ -215,9 +223,15 @@
           (infer (body ast) (extend-tenv (var ast) valsc new-env))
         (values bodyt (compose-subst valsubst bodysubst))))))
 
+(defmethod infer ((ast initialization) tenv)
+  (values (initializer-type (initializer ast) tenv) (empty-subst)))
+
 (defmethod infer ((ast with) tenv)
   ;; Basically like BIND/LET, except we use the initializer's type.
-  (let* ((type (initializer-type (initializer ast) tenv))
+  (let* (;; We ignore the returned subst because we know it's empty:
+         ;; the initialization is an initialization, and check the
+         ;; infer method above
+         (type (infer (initialization ast) tenv))
          ;; This'll force unification with (pointer tvar) as we want.
          ;; (I mean, assuming the body uses the thing.)
          (tptr (make-pointer tvar))

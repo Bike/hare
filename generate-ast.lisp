@@ -34,12 +34,18 @@
                 :then (parse-form then env adt-env)
                 :else (parse-form else env adt-env))))
            ((with)
-            (destructuring-bind ((var &optional (initializer (undef)))
+            (destructuring-bind ((var &optional (initializer nil initializerp))
                                  &rest body)
                 args
-              (let ((lvar (make-variable var)))
+              (let ((lvar (make-variable var))
+                    (initializer
+                      (if initializerp
+                          (parse-initializer initializer env adt-env)
+                          (undef))))
                 (make-instance 'with
-                  :var lvar :initializer initializer
+                  :var lvar
+                  :initialization (make-instance 'initialization
+                                    :initializer initializer)
                   :body (parse-seq
                          body (make-env (list var) (list lvar) env))))))
            #+(or)

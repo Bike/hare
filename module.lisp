@@ -115,3 +115,25 @@
       (make-instance 'module
                      :adt-env adt-env
                      :bindings bindings))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Typing modules
+;;;
+;;; Given module bindings we initialize all ASTs within the initializers.
+;;; We do this in two stages, similar to how we would in letrec: First
+;;; we make a type env where all variables are bound to forall x. (pointer x).
+;;; Then we call initializer-type on each initializer. This side-effects the
+;;; ASTs to fill their type slots.
+;;; We return an alist (variable initializer type) where the type may have
+;;; free tvars.
+;;;
+
+(defun type-bindings (bindings)
+  (let ((initial (loop for (variable . _) in bindings
+                       for tvar = (make-tvar (name variable))
+                       for schema = (schema tvar (list tvar))
+                       collect (cons variable schema))))
+    (loop for (variable . initializer) in bindings
+          collect (list variable initializer
+                        (initializer-type initializer initial)))))

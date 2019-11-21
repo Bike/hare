@@ -34,7 +34,7 @@ A form is either
 
 FIXME: No way to initialize an unsized adt. It can be a union! case! can't do
 shit! Bad bad. Rethink case!, to disambiguate a union it essentially has to
-dereference but the whole poitn should be that it doesn't.
+dereference but the whole point should be that it doesn't.
 But that can't be the point. It doesn't make any sense with having unions.
 A person might want to return a union that's unsized and that's okay.
 Add a new form to force:
@@ -138,17 +138,29 @@ Forces the pointer to point to the particular constructor type, as expected.
     :value (map-ast function (value ast))
     :body (map-ast function (body ast))))
 
+;;; This AST is currently used only in a WITH.
+;;; It's needed because we need a stable type for the initializer
+;;; even though it may have polymorphic components.
+(defclass initialization (ast)
+  ((%initializer :initarg :initializer :accessor initializer
+                 :type initializer)))
+(defmethod mapnil-ast (function (ast initialization))
+  (declare (ignore function)))
+(defmethod map-ast (function (ast initialization))
+  (make-instance 'initialization :initializer (initializer ast)))
+
 (defclass with (ast)
   ((%variable :initarg :variable :accessor variable :type variable)
-   (%initializer :initarg :initializer :accessor initializer
-                 :type initializer)
+   (%initialization :initarg :initialization :accessor initialization
+                    :type initialization)
    (%body :initarg :body :accessor body :type ast)))
 (defmethod mapnil-ast (function (ast with))
-  (mapnil-ast function (body ast)))
+  (mapnil-ast function (body ast))
+  (mapnil-ast function (initialization ast)))
 (defmethod map-ast (function (ast with))
   (make-instance 'with
     :variable (variable ast)
-    :initializer (initializer ast)
+    :initialization (map-ast function (initialization ast))
     :body (map-ast function (body ast))))
 
 (defclass case (ast)
