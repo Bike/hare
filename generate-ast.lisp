@@ -23,10 +23,11 @@
            ((seq) (parse-seq args env))
            ((let)
             (destructuring-bind ((var value) &rest body) args
-              (let ((lvar (make-variable var)))
+              (let* ((lvar (make-variable var))
+                     (new-env (make-env (list var) (list lvar) env)))
                 (make-instance 'bind
                   :var lvar :value (parse-form value env adt-env)
-                  :body (parse-seq body (acons var lvar env))))))
+                  :body (parse-seq body new-env)))))
            ((if)
             (destructuring-bind (test then else) args
               (make-instance 'branch
@@ -40,6 +41,7 @@
               (let ((lvar (make-variable var))
                     (initializer
                       (if initializerp
+                          ;; FIXME: Should be a global env probably
                           (parse-initializer initializer env adt-env)
                           (undef))))
                 (make-instance 'with
@@ -75,6 +77,7 @@
            ((quote)
             (destructuring-bind (spec) args
               (make-instance 'literal
+                ;; Should be a global env
                 :initializer (parse-literal spec env adt-env))))
            (otherwise ; call
             (make-instance 'call

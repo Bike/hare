@@ -127,7 +127,7 @@ available; their values as integers are not defined.
   (or (cached-int len)
       (setf (cached-int len) (make-instance 'int :length len))))
 (defun make-bool () (make-int 1))
-(defmethod mapnil-type (function (type it)) (declare (ignore function)))
+(defmethod mapnil-type (function (type int)) (declare (ignore function)))
 (defmethod map-type (function (type int))
   (declare (ignore function))
   type)
@@ -167,7 +167,7 @@ available; their values as integers are not defined.
         do (mapnil-type function param)))
 (defmethod unparse-type ((type fun))
   `(function ,(unparse-type (fun-return type))
-             ,@(mapcar #'unparse-type (params type))))
+             ,@(mapcar #'unparse-type (parameters type))))
 
 (defclass arrayt (type)
   ((%element-type :initarg :et :accessor arrayt-element-type :type type)))
@@ -341,8 +341,9 @@ available; their values as integers are not defined.
           (make-arrayt (parse-type et env adt-env))))
        ((function)
         (destructuring-bind (ret &rest params) (cdr expr)
-          (make-fun ret (loop for param in params
-                              collect (parse-type param env adt-env)))))
+          (make-fun (parse-type ret env adt-env)
+                    (loop for param in params
+                          collect (parse-type param env adt-env)))))
        (otherwise
         (make-adt (find-adt-def (car expr) adt-env)
                   (loop for type in (cdr expr)

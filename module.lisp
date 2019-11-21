@@ -97,9 +97,7 @@
         collect (make-instance 'variable :name name) into vars
         finally (return (make-env names vars))))
 
-;;; FORMS is a list of defvar, defconstant, and defadt forms.
-;;; Output is a module object.
-(defun parse-module (forms)
+(defun divide-toplevel-forms (forms)
   (let (defadts defvars defconstants)
     (loop for form in forms
           do (cl:case (car form)
@@ -108,6 +106,13 @@
                ((defconstant) (push form defconstants))
                (otherwise
                 (error "Unknown toplevel form: ~a" form))))
+    (values defadts defvars defconstants)))
+
+;;; FORMS is a list of defvar, defconstant, and defadt forms.
+;;; Output is a module object.
+(defun parse-module (forms)
+  (multiple-value-bind (defadts defvars defconstants)
+      (divide-toplevel-forms forms)
     (let* ((adt-env (parse-defadts defadts))
            (env (initial-defvar-env defvars))
            (cenv (parse-defconstants defconstants env adt-env))

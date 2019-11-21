@@ -70,13 +70,13 @@ Forces the pointer to point to the particular constructor type, as expected.
 (defun map-asts (function asts)
   (loop for ast in asts collect (map-ast function ast)))
 
-(defclass seq ()
+(defclass seq (ast)
   (;; A list of ASTs
    (%asts :accessor asts :initarg :asts :type list)))
 (defmethod mapnil-ast (function (ast seq))
   (mapnil-asts function (asts ast)))
 (defmethod map-ast (function (ast seq))
-  (make-instance 'seq :asts (map-asts function (asts seq))))
+  (make-instance 'seq :asts (map-asts function (asts ast))))
 
 (defclass call (ast)
   ((%callee :accessor callee :initarg :callee :type ast)
