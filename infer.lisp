@@ -207,7 +207,10 @@
 (defmethod infer ((ast bind) tenv)
   (multiple-value-bind (valt valsubst) (infer (value ast) tenv)
     (let* ((new-env (subst-tenv valsubst tenv))
-           (valsc (generalize new-env valt)))
+           #+polymorphic-local
+           (valsc (generalize new-env valt))
+           #-polymorphic-local
+           (valsc (schema valt)))
       (multiple-value-bind (bodyt bodysubst)
           (infer (body ast) (extend-tenv (var ast) valsc new-env))
         (values bodyt (compose-subst valsubst bodysubst))))))
@@ -218,8 +221,10 @@
          ;; This'll force unification with (pointer tvar) as we want.
          ;; (I mean, assuming the body uses the thing.)
          (tptr (make-pointer tvar))
-         ;; WITH is polymorphic.
+         #+polymorphic-local
          (sc (generalize tenv tptr))
+         #-polymorphic-local
+         (sc (schema tptr))
          (new-env (extend-tenv (variable ast) sc env)))
     (infer (body ast) new-env)))
 
