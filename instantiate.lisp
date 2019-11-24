@@ -76,7 +76,24 @@
 (defmethod instantiate-initializer ((initializer constructor-initializer)
                                     (abstract adt) (concrete adt)
                                     instance-bindings)
-  ...)
+  (let ((def (adt-def initializer)))
+    (unless (and (eq def (adt-def abstract))
+                 (eq def (adt-def concrete)))
+      ;: FIXME: better message
+      (error "ADT def mismatch while instantiating"))
+    (let ((abstract-subst
+            (mapcar #'cons (tvars def) (adt-args abstract)))
+          (concrete-subst
+            (mapcar #'cons (tvars def) (adt-args concrete)))
+          (types (elt (members def)
+                      (position (constructor initializer)
+                                (constructors def)
+                                :type #'eq))))
+      (loop for type in types
+            for field in (fields initializer)
+            for abst = (subst-type abstract-subst type)
+            for conc = (subst-type concrete-subst type)
+            do (instantiate-initializer field abst conc instance-bindings)))))
 
 (defmethod instantiate-initializer ((initializer lambda-initializer)
                                     (abstract fun) (concrete fun)
