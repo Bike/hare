@@ -100,6 +100,11 @@ available; their values as integers are not defined.
 ;;; Given a type, return a sexp representation for display.
 (defgeneric unparse-type (type))
 
+;;; Determine is types are equal.
+(defun type= (t1 t2)
+  ;; Thanks, caching!
+  (eq t1 t2))
+
 (defmethod print-object ((o type) s)
   (print-unreadable-object (o s)
     (write 'type :stream s)

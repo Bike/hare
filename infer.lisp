@@ -14,17 +14,17 @@
           tenv))
 
 (defun lookup-type (key tenv)
-  (or (cdr (assoc key tenv :test #'eq))
+  (or (cdr (assoc key tenv :test #'type=))
       (error "Unbound: ~s" key)))
 
 (defun restrict-tenv (key tenv)
-  (remove key tenv :key #'car :test #'eq))
+  (remove key tenv :key #'car :test #'type=))
 
 (defun extend-tenv (key schema tenv)
   (acons key schema (restrict-tenv key tenv)))
 
 (defun restrict-tenv-list (keys tenv)
-  (remove-if (lambda (key) (find key keys :test #'eq))
+  (remove-if (lambda (key) (find key keys :test #'type=))
              tenv
              :key #'car))
 
@@ -39,7 +39,7 @@
 ;;; that are not bound in the environment.
 (defun generalize (tenv type)
   (schema type (set-difference (free type) (free-in-tenv tenv)
-                               :test #'eq)))
+                               :test #'type=)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -63,12 +63,12 @@
 ;; Does t1 occur in t2?
 (defun occurs (t1 t2)
   (mapnil-type (lambda (ty)
-                 (when (eq ty t1)
+                 (when (type= ty t1)
                    (return-from occurs t)))
                t2))
 
 (defmethod unify/2 ((t1 tvar) (t2 type))
-  (cond ((eq t1 t2) nil)
+  (cond ((type= t1 t2) nil)
         ((occurs t1 t2)
          (error "Failed occurs check: ~s ~s" t1 t2))
         (t (list (cons t1 t2)))))
