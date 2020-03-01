@@ -11,4 +11,5 @@
    (:file "ast" :depends-on ("type" "env" "packages"))
    (:file "literal" :depends-on ("env" "packages"))
    (:file "generate-ast" :depends-on ("literal" "type" "env" "packages"))
+   (:file "infer" :depends-on ("type" "literal" "ast" "packages"))
    (:file "module" :depends-on ("literal" "env" "packages"))))
