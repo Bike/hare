@@ -59,7 +59,8 @@
 ;;;
 
 ;;; abstract
-(defclass initializer () ())
+(defclass initializer () ()
+  ((%type :accessor type :initarg :type :type type)))
 
 (defclass integer-initializer (initializer)
   ((%value :accessor value :initarg :value :type (integer 0))))
@@ -127,3 +128,29 @@
     (make-instance 'lambda-initializer
       :params vars
       :body (parse-form `(seq ,@forms) env adt-env))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Mapping (for effect)
+;;;
+
+(defgeneric mapnil-initializer (function initializer)
+  (:argument-precedence-order initializer function)
+  (:method :before (function (initializer initializer))
+    (funcall function initializer)))
+
+(defmethod mapnil-initializer (function (i integer-initializer))
+  (declare (ignore function)))
+
+(defmethod mapnil-initializer (function (i variable-initializer))
+  (declare (ignore function)))
+
+(defmethod mapnil-initializer (function (i constructor-initializer))
+  (loop for field in (fields i)
+        do (mapnil-initializer function field)))
+
+(defmethod mapnil-initializer (function (i undef-initializer))
+  (declare (ignore function)))
+
+(defmethod mapnil-initializer (function (i lambda-initializer))
+  (declare (ignore function)))

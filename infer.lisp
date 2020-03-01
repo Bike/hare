@@ -112,38 +112,63 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Initializer types
-;;; This function will set up the types of any lambda initializers within,
-;;; so it serves as the actual entry point into this file.
+;;; INFER-INITIALIZER-TOPLEVEL is prolly the usual entry into this file.
 ;;;
 
-(defgeneric initializer-type (initializer tenv))
+(defgeneric infer-initializer (initializer tenv))
 
-(defmethod initializer-type ((initializer integer-initializer) tenv)
+(defun infer-initializer-toplevel (initializer tenv)
+  (let ((subst (nth-value 1 (infer initializer tenv))))
+    (mapnil-initializer (lambda (initializer)
+                          (setf (type initializer)
+                                (subst-type subst (type initializer))))
+                        initializer)
+    (values (type initializer) subst)))
+
+(defmethod infer-initializer :around (initializer tenv)
+  (multiple-value-bind (type subst)
+      (call-next-method)
+    (setf (type initializer) type)
+    (values type subst)))
+
+(defmethod infer-initializer ((initializer integer-initializer) tenv)
   (declare (ignore tenv))
   ;; Must be an integer type, but we can't express that in the type system.
-  (make-tvar '#:integer))
+  (values (make-tvar '#:integer) (empty-subst)))
 
-(defmethod initializer-type ((initializer variable-initializer) tenv)
-  (instantiate (lookup-type (variable initializer) tenv)))
+(defmethod infer-initializer ((initializer variable-initializer) tenv)
+  (let* ((variable (variable initializer))
+         (type (instantiate (lookup-type variable tenv))))
+    (record-instantiation variable type)
+    (values type (empty-subst))))
 
-(defmethod initializer-type ((initializer constructor-initializer) tenv)
+(defmethod infer-initializer ((initializer constructor-initializer) tenv)
   (let ((def (adt-def initializer)) (constructor (constructor initializer))
         (fields (fields initializer)))
     (multiple-value-bind (members type) (instantiate-adt-def def)
-      (let* ((member (or (assoc constructor members)
-                         (error "BUG: ADT mismatch")))
+      (let* ((member (cdr (or (assoc constructor members)
+                              (error "BUG: ADT mismatch"))))
              (args (adt-args type))
-             (field-types (loop for field in fields
-                                collect (initializer-type field tenv)))
-             (subst (unify-pairwise member field-types)))
-        (subst-type subst type)))))
+             (loop with types = nil
+                   with subst = (empty-subst)
+                   for field in fields
+                   do (multiple-value-bind (ty subs)
+                          (infer-initializer field tenv)
+                        (push ty types)
+                        (setf subst
+                              (compose-subst subs subst)))
+                   finally (let* ((more-subst
+                                    (unify-pairwise member (reverse types)))
+                                  (subst (compose-subst more-subst subst)))
+                             (return (values (subst-type subst type)
+                                             subst)))))))))
 
-(defmethod initializer-type ((initializer undef-initializer) tenv)
+(defmethod infer-initializer ((initializer undef-initializer) tenv)
   (declare (ignore tenv))
   ;; undef can be anything.
-  (make-tvar '#:any))
+  (values (make-tvar '#:any) (empty-subst)))
 
-(defmethod initializer-type ((initializer lambda-initializer) tenv)
+(defmethod infer-initializer ((initializer lambda-initializer) tenv)
   (let* ((params (params initializer))
          (paramtvars (loop for param in params
                            collect (make-tvar (name param))))
@@ -155,14 +180,20 @@
          ;; even though it shouldn't.
          (new-tenv (nconc (mapcar #'cons params paramsc) tenv)))
     (multiple-value-bind (type subst)
-        (infer-ast (body initializer) tenv)
-      (make-fun type
-                (loop for ty in paramtvars
-                      collect (subst-type subst ty))))))
+        (infer-ast-toplevel (body initializer) tenv)
+      (values (make-fun type
+                        (loop for ty in paramtvars
+                              collect (subst-type subst ty)))
+              subst))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Main event
+;;; Infer the type of the given initializer or AST.
+;;; Returns two values: The type and a substitution.
+;;; Modifies the object to have the type in the type slot.
+;;; Use infer-toplevel generally - it will iterate through, running the
+;;; final substitution on all the slotted types.
 ;;;
 
 (defgeneric infer (ast tenv))
@@ -170,7 +201,7 @@
 ;;; entry point: do inference, then recurse back through
 ;;; and apply the substitution to all types.
 ;;; Return the result of inference (but the type has the subst applied).
-(defun infer-ast (ast tenv)
+(defun infer-ast-toplevel (ast tenv)
   (let ((subst (nth-value 1 (infer ast tenv))))
     (mapnil-ast (lambda (ast)
                   (setf (type ast)
