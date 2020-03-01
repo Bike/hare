@@ -108,7 +108,8 @@
   (etypecase initializer
     ((integer 0) (make-instance 'integer-initializer :value initializer))
     ((eql undef) (undef))
-    (symbol (lookup initializer env))
+    (symbol
+     (make-instance 'variable-initializer :variable (lookup initializer env)))
     ((cons (eql lambda))
      (parse-lambda (cadr initializer) (cddr initializer)
                    env adt-env))
