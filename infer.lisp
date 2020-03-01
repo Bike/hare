@@ -139,7 +139,6 @@
 (defmethod infer-initializer ((initializer variable-initializer) tenv)
   (let* ((variable (variable initializer))
          (type (instantiate (lookup-type variable tenv))))
-    (record-instantiation variable type)
     (values type (empty-subst))))
 
 (defmethod infer-initializer ((initializer constructor-initializer) tenv)
@@ -147,21 +146,20 @@
         (fields (fields initializer)))
     (multiple-value-bind (members type) (instantiate-adt-def def)
       (let* ((member (cdr (or (assoc constructor members)
-                              (error "BUG: ADT mismatch"))))
-             (args (adt-args type))
-             (loop with types = nil
-                   with subst = (empty-subst)
-                   for field in fields
-                   do (multiple-value-bind (ty subs)
-                          (infer-initializer field tenv)
-                        (push ty types)
-                        (setf subst
-                              (compose-subst subs subst)))
-                   finally (let* ((more-subst
-                                    (unify-pairwise member (reverse types)))
-                                  (subst (compose-subst more-subst subst)))
-                             (return (values (subst-type subst type)
-                                             subst)))))))))
+                              (error "BUG: ADT mismatch")))))
+        (loop with types = nil
+              with subst = (empty-subst)
+              for field in fields
+              do (multiple-value-bind (ty subs)
+                     (infer-initializer field tenv)
+                   (push ty types)
+                   (setf subst
+                         (compose-subst subs subst)))
+              finally (let* ((more-subst
+                               (unify-pairwise member (reverse types)))
+                             (subst (compose-subst more-subst subst)))
+                        (return (values (subst-type subst type)
+                                        subst))))))))
 
 (defmethod infer-initializer ((initializer undef-initializer) tenv)
   (declare (ignore tenv))
@@ -180,7 +178,7 @@
          ;; even though it shouldn't.
          (new-tenv (nconc (mapcar #'cons params paramsc) tenv)))
     (multiple-value-bind (type subst)
-        (infer-ast-toplevel (body initializer) tenv)
+        (infer-ast-toplevel (body initializer) new-tenv)
       (values (make-fun type
                         (loop for ty in paramtvars
                               collect (subst-type subst ty)))
@@ -217,7 +215,7 @@
     (values type subst)))
 
 (defmethod infer ((ast reference) tenv)
-  (values (instantiate (lookup-type (variable ast) env)) (empty-subst)))
+  (values (instantiate (lookup-type (variable ast) tenv)) (empty-subst)))
 
 (defmethod infer ((ast literal) tenv)
   (values (initializer-type (initializer ast) tenv) (empty-subst)))
@@ -251,9 +249,10 @@
            #-polymorphic-local
            (valsc (schema valt)))
       (multiple-value-bind (bodyt bodysubst)
-          (infer (body ast) (extend-tenv (var ast) valsc new-env))
+          (infer (body ast) (extend-tenv (variable ast) valsc new-env))
         (values bodyt (compose-subst valsubst bodysubst))))))
 
+#|
 (defmethod infer ((ast initialization) tenv)
   (values (initializer-type (initializer ast) tenv) (empty-subst)))
 
@@ -272,6 +271,7 @@
          (sc (schema tptr))
          (new-env (extend-tenv (variable ast) sc env)))
     (infer (body ast) new-env)))
+|#
 
 (defmethod infer ((ast case) tenv)
   ;; I'm pretty unsure about a lot of this.
