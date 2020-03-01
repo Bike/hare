@@ -65,9 +65,17 @@
 (defclass integer-initializer (initializer)
   ((%value :accessor value :initarg :value :type (integer 0))))
 
+(defmethod print-object ((i integer-initializer) stream)
+  (print-unreadable-object (i stream :type t)
+    (write (value i) :stream stream)))
+
 ;;; An initializer that is a toplevel variable.
 (defclass variable-initializer (initializer)
   ((%variable :accessor variable :initarg :variable :type variable)))
+
+(defmethod print-object ((i variable-initializer) stream)
+  (print-unreadable-object (i stream :type t)
+    (write (name (variable i)) :stream stream)))
 
 (defclass constructor-initializer (initializer)
   ((%def :accessor adt-def :initarg :def :type adt-def)
