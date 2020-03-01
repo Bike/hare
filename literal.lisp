@@ -59,7 +59,7 @@
 ;;;
 
 ;;; abstract
-(defclass initializer () ()
+(defclass initializer ()
   ((%type :accessor type :initarg :type :type type)))
 
 (defclass integer-initializer (initializer)

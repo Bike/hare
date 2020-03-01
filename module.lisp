@@ -123,22 +123,103 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; Typing modules
+;;; Manifestation
 ;;;
-;;; Given module bindings we initialize all ASTs within the initializers.
-;;; We do this in two stages, similar to how we would in letrec: First
-;;; we make a type env where all variables are bound to forall x. (pointer x).
-;;; Then we call initializer-type on each initializer. This side-effects the
-;;; ASTs to fill their type slots.
-;;; We return an alist (variable initializer type) where the type may have
-;;; free tvars.
+;;; Given a module and a list of (var . concrete-type) bindings that are
+;;; desired, returns a list of (var (concrete-type . initializer)*) bindings.
+;;; This is self-contained, i.e. contains all the definitions it needs to.
+;;; I'm leaving the possibility of multiple distinct initializers for the sake
+;;; of ad-hoc polymorphism, though at the moment that's not allowed.
+;;; A type is "concrete" if it has no free type variables.
 ;;;
 
-(defun type-bindings (bindings)
-  (let ((initial (loop for (variable . _) in bindings
-                       for tvar = (make-tvar (name variable))
-                       for schema = (schema tvar (list tvar))
-                       collect (cons variable schema))))
-    (loop for (variable . initializer) in bindings
-          collect (list variable initializer
-                        (initializer-type initializer initial)))))
+;;; so basically we shouldn't do any inference except relative to these concrete
+;;; types cos why else bother tbh.............
+;;; Though we will probably be redoing work. Might have to think about it.
+(defun manifest (module desired)
+  (let* ((result nil)
+         (bindings (bindings module))
+         ;; Max polymorphic recursion, so every name can be any pointer.
+         ;; (Of course, these may fail to unify with any definitions present.)
+         (tenv (loop for (var . _) in bindings
+                     for tvar = (make-tvar (name var))
+                     for tptr = (make-pointer tvar)
+                     for schema = (schema tptr (list tvar))
+                     collect (cons variable schema))))
+    ;; worklist structure: just keep adding new instances to instantiate
+    (loop until (null desired)
+          do (destructuring-bind (var . type) (pop desired)
+               ;; If we've done this already, ignore.
+               (let ((existing (assoc var result)))
+                 (unless (and existing
+                              (assoc type (cdr existing)))
+                   ;; OK go.
+                   (multiple-value-bind (init new)
+                       (new-instances var type bindings tenv)
+                     (setf desired (append desired new))
+                     ;; Put the new initializer into the result.
+                     (if existing
+                         (push (cons type init) (cdr existing))
+                         (push (list var (cons type init)) result)))))))
+    result))
+
+;; Take a variable, a concrete type it needs, the list of variable
+;; bindings, and the type environment.
+;; Return two values: an initializer,
+;; and a list of (var . type) that need instantiation.
+(defun new-instances (var type bindings tenv)
+  (let* ((binding (assoc var bindings))
+         (init (or (cdr binding) (error "Who?"))))
+    ;; we use just the basic tenv b/c polymorphic recursion.
+    ;; even the variable we're inferring for could have a different type.
+    ;; NOTE TO SELF: infer-instances needs to walk through the initializer,
+    ;; and return an alist of variables and their types.
+    ;; And they need to be concrete types, since the input type is.
+    (values init (infer-instances init type tenv))))
+
+;; Return a list of variable-initializers and references that are free.
+(defun initializer-free-varthings (initializer)
+  (let ((refs nil))
+    (mapnil-initializer
+     (lambda (initializer)
+       (typecase initializer
+         (variable-initializer
+          (push initializer refs))
+         (lambda-initializer
+          (setf refs
+                (nconc refs
+                       (free-references (body initializer)
+                                        (params initializer)))))))
+     initializer)
+    refs))
+
+(defun infer-instances (initializer concrete tenv)
+  ;; FIXME: Add in assertions that the concrete type is actually concrete,
+  ;; and that the later types are too.
+  ;; KLUDGE: We can infer all the initializers eagerly, earlier.
+  (unless (slot-boundp initializer '%type)
+    (infer-initializer-toplevel initializer tenv))
+  (let* ((free (initializer-free-varthings initializer))
+         (abstract (type initializer))
+         ;; NOTE: If UNIFY is changed later to work by side effects
+         ;; for efficiency, or anything like that,
+         ;; this call still has to be non-side-effectful since it
+         ;; will be done more than once if an initializer needs to
+         ;; be instantiated with multiple concrete types.
+         (subst (unify abstract concrete)))
+    (loop for thing in free ; variable initializers and reference ASTs
+          for variable = (variable thing)
+          ;; Concretize the type
+          for type = (subst-type subst (type thing))
+          ;; FIXME: Assertion that type is concrete goes around here.
+          for existing = (assoc variable result)
+          if (null existing)
+            collect (list variable type) into result
+          else
+            unless (member type (rest existing) :test #'type=)
+              do (push type (cdr existing))
+          finally ; convert into simple (variable . type) pairs
+                  (return
+                    (loop for (variable . types) in result
+                          nconcing (loop for type in types
+                                         collecting (cons variable type)))))))

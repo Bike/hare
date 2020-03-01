@@ -183,3 +183,28 @@ Forces the pointer to point to the particular constructor type, as expected.
     :case!p (case!p ast)
     :cases (loop for (x . sub) in (cases ast)
                  collect (cons x (map-ast function sub)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;: Utilities
+;;;
+
+(defun asts-of-type (ast type)
+  (let ((result nil))
+    (mapnil-ast (lambda (ast)
+                  (when (typep ast type)
+                    ;; NOTE: May need PUSHNEW if circularity is ever allowed
+                    (push ast result)))
+                ast)
+    result))
+
+;;; Given an AST and a list of variables bound around it,
+;;; return a list of reference-ast's that are free.
+;;; KLUDGE: Not very efficient. (And really, calling it
+;;; more than once is a bit daft.)
+(defun free-references (ast bound)
+  (let* ((binds (asts-of-type ast 'bind))
+         (bound (nconc (mapcar #'variable binds) bound)))
+    (loop for ref in (asts-of-type ast 'reference)
+          unless (member (variable ref) bound)
+            collect ref)))
