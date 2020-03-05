@@ -145,7 +145,7 @@
                      for tvar = (make-tvar (name var))
                      for tptr = (make-pointer tvar)
                      for schema = (schema tptr (list tvar))
-                     collect (cons variable schema))))
+                     collect (cons var schema))))
     ;; worklist structure: just keep adding new instances to instantiate
     (loop until (null desired)
           do (destructuring-bind (var . type) (pop desired)
