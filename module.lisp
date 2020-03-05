@@ -8,6 +8,9 @@
 
 (defclass module ()
   ((adt-env :initarg :adt-env :accessor adt-env :type adt-env)
+   ;; A list of (variable type string), the last being a C identifier.
+   ;; (Or maybe later a shared object identifier.)
+   (exports :initarg :exports :accessor exports :type list)
    ;; FIXME: Should store constants.
    ;; Also type aliases once those are implemented.
    ;; Also externs.
@@ -97,29 +100,44 @@
         collect (make-instance 'variable :name name) into vars
         finally (return (make-env names vars))))
 
+(defun parse-export (decl var-env type-env adt-env)
+  (destructuring-bind (export name type c-name)
+      decl
+    (declare (ignore export))
+    (check-type name symbol)
+    (check-type c-name string)
+    (list (lookup name var-env) (parse-type type type-env adt-env) c-name)))
+
+(defun parse-exports (decls var-env type-env adt-env)
+  (loop for decl in decls
+        collect (parse-export decl var-env type-env adt-env)))
+
 (defun divide-toplevel-forms (forms)
-  (let (defadts defvars defconstants)
+  (let (defadts defvars defconstants exports)
     (loop for form in forms
           do (cl:case (car form)
                ((defadt) (push form defadts))
                ((defvar) (push form defvars))
                ((defconstant) (push form defconstants))
+               ((export) (push form exports))
                (otherwise
                 (error "Unknown toplevel form: ~a" form))))
-    (values defadts defvars defconstants)))
+    (values defadts defvars defconstants exports)))
 
-;;; FORMS is a list of defvar, defconstant, and defadt forms.
+;;; FORMS is a list of top level forms.
 ;;; Output is a module object.
 (defun parse-module (forms)
-  (multiple-value-bind (defadts defvars defconstants)
+  (multiple-value-bind (defadts defvars defconstants exports)
       (divide-toplevel-forms forms)
     (let* ((adt-env (parse-defadts defadts))
            (env (initial-defvar-env defvars))
            (cenv (parse-defconstants defconstants env adt-env))
+           (exports (parse-exports exports env nil adt-env))
            (bindings (make-bindings defvars cenv adt-env)))
       (make-instance 'module
-                     :adt-env adt-env
-                     :bindings bindings))))
+        :adt-env adt-env
+        :exports exports
+        :bindings bindings))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
