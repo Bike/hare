@@ -1,2 +1,3 @@
 (defpackage #:hare-llvm
-  (:use #:cl #:hare))
+  (:use #:cl #:hare)
+  (:shadowing-import-from #:hare #:variable))

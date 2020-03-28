@@ -241,19 +241,3 @@
                     (loop for (variable . types) in result
                           nconcing (loop for type in types
                                          collecting (cons variable type)))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;;
-
-(defun single-module (forms)
-  (with-type-cache ()
-    (let* ((module (parse-module forms))
-           (exports (exports module))
-           (export-map (loop for (var type) in exports
-                             collect (cons var type)))
-           (needed (manifest module export-map)))
-      (hare-llvm::with-module ("test")
-        (hare-llvm::bindings->llvm needed exports)
-        (llvm:verify-module hare-llvm::*module*)
-        (llvm:write-bitcode-to-file hare-llvm::*module* "/tmp/test.bc")))))
