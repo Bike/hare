@@ -78,6 +78,11 @@ available; their values as integers are not defined.
 
 (defvar *type-cache*)
 
+(defmacro with-type-cache ((&rest options) &body body)
+  (declare (ignore options)) ; for future expansion
+  `(let ((*type-cache* (make-instance 'type-cache)))
+     ,@body))
+
 (defmacro cached-int (n)
   `(gethash ,n (type-cache-ints *type-cache*)))
 (defmacro cached-pointer (ty)

@@ -118,7 +118,7 @@
 (defgeneric infer-initializer (initializer tenv))
 
 (defun infer-initializer-toplevel (initializer tenv)
-  (let ((subst (nth-value 1 (infer initializer tenv))))
+  (let ((subst (nth-value 1 (infer-initializer initializer tenv))))
     (mapnil-initializer (lambda (initializer)
                           (setf (type initializer)
                                 (subst-type subst (type initializer))))
@@ -218,7 +218,7 @@
   (values (instantiate (lookup-type (variable ast) tenv)) (empty-subst)))
 
 (defmethod infer ((ast literal) tenv)
-  (values (initializer-type (initializer ast) tenv) (empty-subst)))
+  (infer-initializer (initializer ast) tenv))
 
 (defmethod infer ((ast seq) tenv)
   ;; FIXME: Unify the discarded values with Unit. (and define Unit.)
