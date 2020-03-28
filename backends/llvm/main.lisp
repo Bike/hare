@@ -11,3 +11,8 @@
         (bindings->llvm needed exports)
         (llvm:verify-module *module*)
         (llvm:write-bitcode-to-file *module* "/tmp/test.bc")))))
+
+#| ;; e.g.
+(single-module '((defvar main (lambda () 0))
+                 (export main (function (hare:int 32)) "main")))
+|#
