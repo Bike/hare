@@ -171,7 +171,7 @@ available; their values as integers are not defined.
   (make-fun (map-type function (fun-return type))
             (loop for param in (parameters type)
                   collect (map-type function param))))
-(defmethod mapnil-type (function (type pointer))
+(defmethod mapnil-type (function (type fun))
   (mapnil-type function (fun-return type))
   (loop for param in (parameters type)
         do (mapnil-type function param)))
