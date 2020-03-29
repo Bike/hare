@@ -18,7 +18,7 @@
 (single-module '((defvar main (lambda (argc argv) (id argc)))
                  (export main (function (hare:int 32)
                                (hare:int 32) (hare:pointer
-                                              (array (hare:int 8))))
+                                              (hare:pointer (hare:int 8))))
                   "main")
                  (defvar id (lambda (x) x))))
 |#
