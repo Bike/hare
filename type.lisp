@@ -90,7 +90,7 @@ available; their values as integers are not defined.
 (defmacro cached-fun (key)
   `(gethash ,key (type-cache-funs *type-cache*)))
 (defmacro cached-array (ty)
-  `(gethash ,ty (type-cache-arrays ty)))
+  `(gethash ,ty (type-cache-arrays *type-cache*)))
 (defmacro cached-adt (key)
   `(gethash ,key (type-cache-adts *type-cache*)))
 
@@ -187,7 +187,7 @@ available; their values as integers are not defined.
 (defmethod map-type (function (type arrayt))
   (make-arrayt (map-type function (arrayt-element-type type))))
 (defmethod mapnil-type (function (type arrayt))
-  (mapnil-type function (array-element-type type)))
+  (mapnil-type function (arrayt-element-type type)))
 (defmethod unparse-type ((type arrayt))
   `(array ,(unparse-type (arrayt-element-type type))))
 
