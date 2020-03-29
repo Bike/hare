@@ -228,7 +228,8 @@
     (loop for thing in free ; variable initializers and reference ASTs
           for variable = (variable thing)
           ;; Concretize the type
-          for type = (subst-type subst (type thing))
+          ;; The reference will be of a pointer, so undo that.
+          for type = (subst-type subst (pointer-type-underlying (type thing)))
           ;; FIXME: Assertion that type is concrete goes around here.
           for existing = (assoc variable result)
           if (null existing)
