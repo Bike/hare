@@ -45,32 +45,39 @@
 
 (defvar *type-map*)
 
-(defun bindings->llvm (bindings exports)
+(defun bindings->llvm (bindings exports externs)
   (let ((global-binds
-          (loop for (var . things) in bindings
-                ;; Get a list of exports for this var.
-                for var-exports = (remove var exports
-                                          :test-not #'eq :key #'first)
-                for name = (string-downcase (symbol-name (name var)))
-                collecting
-                (cons var
-                      (loop for (type . initializer) in things
-                            for export = (find type var-exports
-                                               :test #'hare::type=
-                                               :key #'second)
-                            for cname = (third export)
-                            for mname = (or cname (mangle name type))
-                            for *type-map*
-                              = (unify (hare::type initializer) type)
-                            for global = (initializer-global initializer
-                                                             :name mname)
-                            collect (list type *type-map*
-                                          initializer global))))))
+          (append
+           (loop for (var type cname) in externs
+                 collecting
+                 (cons var
+                       (list
+                        (list type nil nil (extern-global type :name cname)))))
+           (loop for (var . things) in bindings
+                 ;; Get a list of exports for this var.
+                 for var-exports = (remove var exports
+                                           :test-not #'eq :key #'first)
+                 for name = (string-downcase (symbol-name (name var)))
+                 collecting
+                 (cons var
+                       (loop for (type . initializer) in things
+                             for export = (find type var-exports
+                                                :test #'hare::type=
+                                                :key #'second)
+                             for cname = (third export)
+                             for mname = (or cname (mangle name type))
+                             for *type-map*
+                               = (unify (hare::type initializer) type)
+                             for global = (initializer-global initializer
+                                                              :name mname)
+                             collect (list type *type-map*
+                                           initializer global)))))))
     (loop with global-env = (make-instance 'env :globals global-binds)
           for (var . things) in global-binds
           do (loop for (type *type-map* initializer global) in things
-                   do (translate-initializer initializer global
-                                             global-env)))))
+                   unless (null initializer) ; extern
+                     do (translate-initializer initializer global
+                                               global-env)))))
 
 (defun mangle (name type)
   ;; FIXME
@@ -86,6 +93,14 @@
 
 (defmacro with-builder ((&rest args) &body body)
   `(llvm:with-object (*builder* llvm:builder ,@args) ,@body))
+
+;;;
+;; Construct and return an LLVMValueRef for the extern global.
+(defgeneric extern-global (type &key name))
+
+(defmethod extern-global ((type fun) &key (name ""))
+  (let ((type (type->llvm type)))
+    (llvm:add-function *module* name type)))
 
 ;;;
 

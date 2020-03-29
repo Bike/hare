@@ -7,13 +7,14 @@
 ;;; information.
 
 (defclass module ()
+  ;; FIXME: Should store constants.
+  ;; Also type aliases once those are implemented.
   ((adt-env :initarg :adt-env :accessor adt-env :type adt-env)
    ;; A list of (variable type string), the last being a C identifier.
    ;; (Or maybe later a shared object identifier.)
    (exports :initarg :exports :accessor exports :type list)
-   ;; FIXME: Should store constants.
-   ;; Also type aliases once those are implemented.
-   ;; Also externs.
+   ;; A list of (variable type string) like exports.
+   (externs :initarg :externs :accessor externs :type list)
    ;; BINDINGS is an alist from variables to initializers.
    ;; FIXME: Could be made into an actual structure.
    (bindings :initarg :bindings :accessor bindings :type list)))
@@ -94,8 +95,8 @@
                        (parse-initializer (first rest) env adt-env))
         collect (cons var init)))
 
-(defun initial-defvar-env (defvars)
-  (loop for (_ name) in defvars
+(defun initial-env (defvars-and-externs)
+  (loop for (_ name) in defvars-and-externs
         collect name into names
         collect (make-instance 'variable :name name) into vars
         finally (return (make-env names vars))))
@@ -112,31 +113,48 @@
   (loop for decl in decls
         collect (parse-export decl var-env type-env adt-env)))
 
+(defun parse-extern (decl var-env type-env adt-env)
+  (destructuring-bind (extern name type c-name)
+      decl
+    (declare (ignore extern))
+    (check-type name symbol)
+    (check-type c-name string)
+    (list (lookup name var-env)
+          (parse-type type type-env adt-env)
+          c-name)))
+
+(defun parse-externs (decls var-env type-env adt-env)
+  (loop for decl in decls
+        collect (parse-extern decl var-env type-env adt-env)))
+
 (defun divide-toplevel-forms (forms)
-  (let (defadts defvars defconstants exports)
+  (let (defadts defvars defconstants exports externs)
     (loop for form in forms
           do (cl:case (car form)
                ((defadt) (push form defadts))
                ((defvar) (push form defvars))
                ((defconstant) (push form defconstants))
                ((export) (push form exports))
+               ((extern) (push form externs))
                (otherwise
                 (error "Unknown toplevel form: ~a" form))))
-    (values defadts defvars defconstants exports)))
+    (values defadts defvars defconstants exports externs)))
 
 ;;; FORMS is a list of top level forms.
 ;;; Output is a module object.
 (defun parse-module (forms)
-  (multiple-value-bind (defadts defvars defconstants exports)
+  (multiple-value-bind (defadts defvars defconstants exports externs)
       (divide-toplevel-forms forms)
     (let* ((adt-env (parse-defadts defadts))
-           (env (initial-defvar-env defvars))
+           (env (initial-env (append defvars externs)))
+           (pexterns (parse-externs externs env nil adt-env))
            (cenv (parse-defconstants defconstants env adt-env))
            (exports (parse-exports exports env nil adt-env))
            (bindings (make-bindings defvars cenv adt-env)))
       (make-instance 'module
         :adt-env adt-env
         :exports exports
+        :externs pexterns
         :bindings bindings))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -145,7 +163,6 @@
 ;;;
 ;;; Given a module and a list of (var . concrete-type) bindings that are
 ;;; desired, returns a list of (var (concrete-type . initializer)*) bindings.
-;;; This is self-contained, i.e. contains all the definitions it needs to.
 ;;; I'm leaving the possibility of multiple distinct initializers for the sake
 ;;; of ad-hoc polymorphism, though at the moment that's not allowed.
 ;;; A type is "concrete" if it has no free type variables.
@@ -157,13 +174,22 @@
 (defun manifest (module desired)
   (let* ((result nil)
          (bindings (bindings module))
+         ;; Type environment for the defvars.
          ;; Max polymorphic recursion, so every name can be any pointer.
          ;; (Of course, these may fail to unify with any definitions present.)
-         (tenv (loop for (var . _) in bindings
-                     for tvar = (make-tvar (name var))
-                     for tptr = (make-pointer tvar)
-                     for schema = (schema tptr (list tvar))
-                     collect (cons var schema))))
+         (tenv1 (loop for (var . _) in bindings
+                      for tvar = (make-tvar (name var))
+                      for tptr = (make-pointer tvar)
+                      for schema = (schema tptr (list tvar))
+                      collect (cons var schema)))
+         ;; Type environment from extern declarations
+         (externs (externs module))
+         (extern-vars (mapcar #'first externs))
+         (tenv2 (loop for (var type _) in externs
+                      for tptr = (make-pointer type)
+                      for schema = (schema tptr)
+                      collect (cons var schema)))
+         (tenv (append tenv1 tenv2)))
     ;; worklist structure: just keep adding new instances to instantiate
     (loop until (null desired)
           do (destructuring-bind (var . type) (pop desired)
@@ -173,7 +199,7 @@
                               (assoc type (cdr existing)))
                    ;; OK go.
                    (multiple-value-bind (init new)
-                       (new-instances var type bindings tenv)
+                       (new-instances var type bindings tenv extern-vars)
                      (setf desired (append desired new))
                      ;; Put the new initializer into the result.
                      (if existing
@@ -185,7 +211,7 @@
 ;; bindings, and the type environment.
 ;; Return two values: an initializer,
 ;; and a list of (var . type) that need instantiation.
-(defun new-instances (var type bindings tenv)
+(defun new-instances (var type bindings tenv bound)
   (let* ((binding (assoc var bindings))
          (init (or (cdr binding) (error "Who?"))))
     ;; we use just the basic tenv b/c polymorphic recursion.
@@ -193,31 +219,33 @@
     ;; NOTE TO SELF: infer-instances needs to walk through the initializer,
     ;; and return an alist of variables and their types.
     ;; And they need to be concrete types, since the input type is.
-    (values init (infer-instances init type tenv))))
+    (values init (infer-instances init type tenv bound))))
 
 ;; Return a list of variable-initializers and references that are free.
-(defun initializer-free-varthings (initializer)
+(defun initializer-free-varthings (initializer bound)
   (let ((refs nil))
     (mapnil-initializer
      (lambda (initializer)
        (typecase initializer
          (variable-initializer
-          (push initializer refs))
+          (unless (member (variable initializer) bound)
+            (push initializer refs)))
          (lambda-initializer
           (setf refs
                 (nconc refs
                        (free-references (body initializer)
-                                        (params initializer)))))))
+                                        (append bound
+                                                (params initializer))))))))
      initializer)
     refs))
 
-(defun infer-instances (initializer concrete tenv)
+(defun infer-instances (initializer concrete tenv bound)
   ;; FIXME: Add in assertions that the concrete type is actually concrete,
   ;; and that the later types are too.
   ;; KLUDGE: We can infer all the initializers eagerly, earlier.
   (unless (slot-boundp initializer '%type)
     (infer-initializer-toplevel initializer tenv))
-  (let* ((free (initializer-free-varthings initializer))
+  (let* ((free (initializer-free-varthings initializer bound))
          (abstract (type initializer))
          ;; NOTE: If UNIFY is changed later to work by side effects
          ;; for efficiency, or anything like that,

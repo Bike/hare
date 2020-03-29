@@ -8,7 +8,7 @@
                              collect (cons var type)))
            (needed (hare::manifest module export-map)))
       (with-module ("test")
-        (bindings->llvm needed exports)
+        (bindings->llvm needed exports (hare::externs module))
         (llvm:verify-module *module*)
         (llvm:write-bitcode-to-file *module* "/tmp/test.bc")))))
 
