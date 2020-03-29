@@ -296,6 +296,11 @@ available; their values as integers are not defined.
 (defun schema (type &optional tvars)
   (make-instance 'schema :tvars tvars :type type))
 
+(defmethod print-object ((object schema) stream)
+  (print-unreadable-object (object stream :type t)
+    (format stream "∀~:a: ~a" (mapcar #'name (tvars object))
+            (unparse-type (type object)))))
+
 ;;; Return a list of tvariables free in type or schema or whatever.
 (defun free (type)
   (let ((tvars nil))
