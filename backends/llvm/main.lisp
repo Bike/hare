@@ -1,6 +1,6 @@
 (in-package #:hare-llvm)
 
-(defun single-module (forms)
+(defun single-module (forms &optional (to-file "/tmp/test.bc"))
   (hare::with-type-cache ()
     (let* ((module (hare::parse-module forms))
            (exports (hare::exports module))
@@ -10,7 +10,7 @@
       (with-module ("test")
         (bindings->llvm needed exports (hare::externs module))
         (llvm:verify-module *module*)
-        (llvm:write-bitcode-to-file *module* "/tmp/test.bc")))))
+        (llvm:write-bitcode-to-file *module* to-file)))))
 
 #| ;; e.g.
 (single-module '((defvar main (lambda () 0))
