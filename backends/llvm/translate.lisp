@@ -10,19 +10,67 @@
 
 ;;;
 
+;; locals and globals are separate, as globals, being polymorphic, need a type.
+;; locals are just an alist of (variable . llvm-value)
+;; globals are an alist of (variable . (type map initializer llvm-value))
+(defclass env ()
+  ((%locals :initarg :locals :initform nil :accessor locals)
+   (%globals :initarg :globals :accessor globals)))
+
+(defun augment (env pairs)
+  (make-instance 'env
+    :globals (globals env)
+    :locals (append pairs (locals env))))
+
+(defun %lookup (variable type env)
+  (let ((localpair (assoc variable (locals env))))
+    (if localpair
+        (cdr localpair)
+        (let ((globalpair (assoc variable (globals env))))
+          (if globalpair
+              (let* ((type (subst-type *type-map*
+                                       (hare:pointer-type-underlying type)))
+                     (typepair (assoc type (rest globalpair)
+                                      :test #'hare::type=)))
+                (if typepair
+                    (fourth typepair)
+                    nil))
+              nil)))))
+
+(defun lookup (variable type env)
+  (or (%lookup variable type env)
+      (error "BUG in translate: Unknown variable ~a" variable)))
+
+;;;
+
 (defvar *type-map*)
 
 (defun bindings->llvm (bindings exports)
-  (loop for (var . things) in bindings
-        for var-exports = (remove var exports :test-not #'eq :key #'first)
-        for name = (string-downcase (symbol-name (name var)))
-        do (loop for (type . initializer) in things
-                 for export = (find type var-exports :test #'hare::type=
-                                                     :key #'second)
-                 for cname = (third export)
-                 for mname = (or cname (mangle name type))
-                 for *type-map* = (unify (hare::type initializer) type)
-                 do (translate-initializer initializer :name mname))))
+  (let ((global-binds
+          (loop for (var . things) in bindings
+                ;; Get a list of exports for this var.
+                for var-exports = (remove var exports
+                                          :test-not #'eq :key #'first)
+                for name = (string-downcase (symbol-name (name var)))
+                collecting
+                (cons var
+                      (loop for (type . initializer) in things
+                            for export = (find type var-exports
+                                               :test #'hare::type=
+                                               :key #'second)
+                            for cname = (third export)
+                            for mname = (or cname (mangle name type))
+                            for *type-map*
+                              = (unify (hare::type initializer) type)
+                            for global = (initializer-global initializer
+                                                             :name mname)
+                            collect (list type *type-map*
+                                          initializer global))))))
+    (loop with global-env = (make-instance 'env :globals global-binds)
+          for (var . things) in global-binds
+          do (loop for (type *type-map* initializer global) in things
+                   do (translate-initializer initializer global
+                                             global-env)))))
 
 (defun mangle (name type)
   ;; FIXME
@@ -41,16 +89,24 @@
 
 ;;;
 
-(defgeneric translate-initializer (initializer &key name))
+;; Construct and return an LLVMValueRef for the global.
+(defgeneric initializer-global (initializer &key name))
+
+(defmethod initializer-global ((initializer hare::lambda-initializer)
+                               &key (name ""))
+  (let ((type (translate-type (hare::type initializer))))
+    (llvm:add-function *module* name type)))
+
+;;;
+
+(defgeneric translate-initializer (initializer valref global-env))
 
 (defmethod translate-initializer ((lambda-initializer hare::lambda-initializer)
-                                  &key (name ""))
+                                  function global-env)
   (let* ((params (hare::params lambda-initializer))
          (body (body lambda-initializer))
-         (type (translate-type (hare::type lambda-initializer)))
-         (function (llvm:add-function *module* name type))
          (lparams (llvm:params function))
-         (env (mapcar #'cons params lparams))
+         (env (augment global-env (mapcar #'cons params lparams)))
          (entry (llvm:append-basic-block function "entry")))
     (with-builder ()
       (llvm:position-builder-at-end *builder* entry)
@@ -95,10 +151,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
   (translate-literal (initializer ast)))
 
 (defmethod translate-ast ((ast reference) env)
-  (let ((pair (assoc (variable ast) env)))
-    (if pair
-        (cdr pair)
-        (error "BUG"))))
+  (lookup (variable ast) (hare::type ast) env))
 
 (defmethod translate-ast ((ast branch) env)
   (let ((condition (translate-ast (test ast) env))
@@ -133,7 +186,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 (defmethod translate-ast ((ast bind) env)
   (let* ((value (translate-ast (value ast) env))
          (_ (unless value (return-from translate-ast nil)))
-         (new-env (acons (variable ast) value env)))
+         (new-env (augment env (list (cons (variable ast) value)))))
     (declare (ignore _))
     (translate-ast (body ast) new-env)))
 
