@@ -240,8 +240,9 @@
     refs))
 
 (defun infer-instances (initializer concrete tenv bound)
-  ;; FIXME: Add in assertions that the concrete type is actually concrete,
-  ;; and that the later types are too.
+  (unless (concrete-type-p concrete)
+    (error "Type ~a cannot be used for instantiation as it has free variables."
+           concrete))
   ;; KLUDGE: We can infer all the initializers eagerly, earlier.
   (unless (slot-boundp initializer '%type)
     (infer-initializer-toplevel initializer tenv))

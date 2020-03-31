@@ -202,6 +202,13 @@ available; their values as integers are not defined.
   type)
 (defmethod unparse-type ((type tvar)) (name type))
 
+(defun concrete-type-p (type)
+  (mapnil-type (lambda (type)
+                 (when (typep type 'tvar)
+                   (return-from concrete-type-p nil)))
+               type)
+  t)
+
 ;;; A "subst" is an alist (tvar . type) used to describe substitutions.
 (defun empty-subst () nil)
 
