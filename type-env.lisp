@@ -1,5 +1,14 @@
 (in-package #:hare)
 
+#|
+These have bindings from names in the ADT namespace and constructor namespace
+to adt-defs, and from names in the type namespace to types.
+
+The functions FIND-ADT-DEF and FIND-ADT-DEF-FROM-CONSTRUCTOR are available,
+as well as FIND-TYPE. MAKE-TYPE-ENV makes an empty environment and ADD-ADT-DEF
+and ADD-TYPE modify one.
+|#
+
 (defclass type-env ()
   (;; Type aliases. Alist (name . type)
    (%types :initform (make-hash-table :test #'eq) :accessor types

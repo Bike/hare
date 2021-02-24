@@ -4,16 +4,11 @@
 
 During compilation we make use of two kinds of environments, "environments" and
 "type environments". The former hold bindings from names in the "variable
-namespace" I guess I'll call it to either variable or initializer objects. The
-latter hold bindings from names in the ADT namespace and constructor namespace
-to adt-defs, and names in the type namespace to types.
+namespace" I guess I'll call it to either variable or initializer objects.
 
 The function LOOKUP gets things from the first kind of environment.
 MAKE-ENV can be used to make a new environment. It takes a list of names and
 a list of values (i.e. variables or initializers), and optionally a parent env.
-
-For type envs, the functions FIND-ADT-DEF and FIND-ADT-DEF-FROM-CONSTRUCTOR are
-available, as well as FIND-TYPE. MAKE-TYPE-ENV makes an empty environment and ADD-ADT-DEF and ADD-TYPE modify one.
 
 |#
 
