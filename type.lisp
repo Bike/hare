@@ -339,7 +339,7 @@ available; their values as integers are not defined.
 ;;;
 ;;; Parsing types.
 
-;;; Type environments are as in env.lisp.
+;;; Type environments are as in type-env.lisp.
 (defun parse-type (expr type-env)
   (etypecase expr
     (symbol ; alias or zero-arg adt.
