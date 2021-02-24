@@ -37,9 +37,9 @@ is treated as unsized, and furthermore cannot be used directly.
 For example, take (defadt foo () (bar (array foo))). This is illegal because
 foo is unsized within its own definition. (defadt foo () (bar foo)) is also
 illegal, even though having one unsized member would usually be okay.
-(defadt foo () (bar (pointer foo))) is okay. (defadt foo (x) (bar (array x))) is okay;
-(foo (foo bool)) is not, but that's because an array of arrays isn't valid because
-arrays are unsized.
+(defadt foo () (bar (pointer foo))) is okay. (defadt foo (x) (bar (array x)))
+is okay; (foo (foo bool)) is not, but that's because an array of arrays isn't
+valid because arrays are unsized.
 
 The types byte and word are predefined. They are integer types for
 the target architecture's smallest addressable unit and most
@@ -241,18 +241,23 @@ available; their values as integers are not defined.
 ;;; ADT stuff
 ;;;
 
+;;; Definition of a particular constructor in an ADT. Not a type.
+(defclass constructor ()
+  ((%name :initarg :name :reader name :type symbol)
+   ;; A proper list of TYPEs
+   (%fields :initarg :fields :accessor fields :type list)))
+
 ;;; Definition of an ADT schema thing, as from defadt. Not a type.
 (defclass adt-def ()
   ((%name :initarg :name :accessor name :type symbol)
-   ;; A list of bound type variables (tvars)
+   ;; A proper list of bound type variables (TVARs)
    (%tvars :initarg :tvars :accessor tvars :type list)
-   ;; A list of constructor names (symbols)
-   (%constructors :initarg :constructors :accessor constructors :type list)
-   ;; A list of (type*), corresponding to the constructors.
-   (%members :initarg :members :accessor members :type list)))
+   ;; A proper list of CONSTRUCTORs
+   (%constructors :initarg :constructors :accessor constructors :type list)))
 
 ;;; E.g., if we have (defadt foo (x) ...), and then refer to (foo (int 3))
 ;;; somewhere, we have one of these, with args = ((int 3)) but it's a type.
+;;; In type theory this is more often called TApp or the like.
 (defclass adt (type)
   (;; Which ADT definition this is an instantiation of.
    (%def :initarg :def :accessor adt-def :type adt-def)
@@ -281,9 +286,11 @@ available; their values as integers are not defined.
          (new (loop for tvar in old collect (make-tvar (name tvar))))
          (map (mapcar #'cons old new)))
     (values
-     (flet ((substt (type) (subst-type map type)))
-       (loop for member in (members adt-def)
-             collect (mapcar #'substt member)))
+     (loop for constructor in (constructors adt-def)
+           collect (make-instance 'constructor
+                     :name (name constructor)
+                     :fields (loop for field in (fields constructor)
+                                   collect (subst-type map field))))
      (make-adt adt-def new))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
