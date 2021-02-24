@@ -12,8 +12,7 @@
 ;;; Literals consist of:
 ;;;  * Integer constants (all positive and decimal, for the moment).
 ;;;  * Names defined with defconstant.
-;;;  * (constructor literal*) where constructor is from some ADT and must be
-;;;    sized.
+;;;  * (constructor literal*) where constructor is from some ADT and sized.
 ;;;
 ;;; Initializers consist of:
 ;;;  * Integer constants.
