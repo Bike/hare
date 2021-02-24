@@ -5,31 +5,30 @@
 A form is either
  * A symbol, referring to either a local variable or a global thing
  * A cons
-   ** (let (symbol form) form*) binds a local variable
-   ** (if condition then else): Obvious. Condition must be a bool.
-   ** (seq form*): progn
-   ** (case form ((constructor var*) form*)*) deconstructs an ADT value.
-      Like Haskell. If form isn't typed to a sized ADT, type error.
-   ** (case! form ((constructor var*) form*)*) is like case, but form must
-      evalaute to a pointer to an ADT. The vars are bound to pointers
-      to the constructor fields. The ADT may be sized or unsized.
-      Passing a pointer in to case! counts as dereferencing it.
-   ** (with (var [initializer]) form*) allocates a value on the stack.
-      The variable named symbol is bound to a pointer to a value of
-       the inferred type. If this type is unsized, an initializer must
-       be provided so the compiler can determine a size.
-      If there is no initializer and the pointer is dereferenced before
-       a value is stored in it, the consequences are undefined.
-      If the pointer is dereferenced after the with form exits,
-       the consequences are undefined.
-   ** (with-array (var n) form*) allocates an array of values on
-       the stack. n is an integer-typed form, or an integer literal.
-      The type of the variable must be inferred to be an unsized type,
-       and more specifically, either an array or an unsized ADT.
-      In the latter case n is used recursively with that member.
-      NOTE: Not implemented yet.
-   ** otherwise, a function call. The callee must be a function pointer
-       with types matching the arguments.
+   * (let (symbol form) form*) binds a local variable
+   * (if condition then else): Obvious. Condition must be a bool.
+   * (seq form*): progn
+   * (case form ((constructor var*) form*)*) deconstructs an ADT value.
+     Like Haskell. If form isn't typed to a sized ADT, type error.
+   * (case! form ((constructor var*) form*)*) is like case, but form must
+     evalaute to a pointer to an ADT. The vars are bound to pointers
+     to the constructor fields. The ADT may be sized or unsized.
+   * (with (var [initializer]) form*) allocates a value on the stack.
+     The variable named symbol is bound to a pointer to a value of
+      the inferred type. If this type is unsized, an initializer must
+      be provided so the compiler can determine a size.
+     If there is no initializer and the pointer is dereferenced before
+      a value is stored in it, the consequences are undefined.
+     If the pointer is dereferenced after the with form exits,
+      the consequences are undefined.
+   * (with-array (var n) form*) allocates an array of values on
+      the stack. n is an integer-typed form, or an integer literal.
+     The type of the variable must be inferred to be an unsized type,
+      and more specifically, either an array or an unsized ADT.
+     In the latter case n is used recursively with that member.
+     NOTE: Not implemented yet.
+   * otherwise, a function call. The callee must be a function pointer
+      with types matching the arguments.
  * A literal (see literals.lisp)
 
 FIXME: No way to initialize an unsized adt. It can be a union! case! can't do
