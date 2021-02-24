@@ -6,11 +6,11 @@
 ;;;
 
 ;;; FIXME: Should we really handle case like this? I'm not sure.
-(defun parse-form (form env adt-env)
+(defun parse-form (form env type-env)
   (flet ((parse-seq (list env)
            (make-instance 'seq
              :asts (loop for form in list
-                         collect (parse-form form env adt-env)))))
+                         collect (parse-form form env type-env)))))
     (etypecase form
       (symbol
        (let ((thing (lookup form env)))
@@ -26,14 +26,14 @@
               (let* ((lvar (make-variable var))
                      (new-env (make-env (list var) (list lvar) env)))
                 (make-instance 'bind
-                  :var lvar :value (parse-form value env adt-env)
+                  :var lvar :value (parse-form value env type-env)
                   :body (parse-seq body new-env)))))
            ((if)
             (destructuring-bind (test then else) args
               (make-instance 'branch
-                :test (parse-form test env adt-env)
-                :then (parse-form then env adt-env)
-                :else (parse-form else env adt-env))))
+                :test (parse-form test env type-env)
+                :then (parse-form then env type-env)
+                :else (parse-form else env type-env))))
            ((with)
             (destructuring-bind ((var &optional (initializer nil initializerp))
                                  &rest body)
@@ -42,7 +42,7 @@
                     (initializer
                       (if initializerp
                           ;; FIXME: Should be a global env probably
-                          (parse-initializer initializer env adt-env)
+                          (parse-initializer initializer env type-env)
                           (undef))))
                 (make-instance 'with
                   :var lvar
@@ -55,14 +55,14 @@
             (destructuring-bind ((var len) &rest body) args
               (let ((lvar (make-variable var)))
                 (make-instance 'with
-                  :var (make-variable var) :len (parse-form len env adt-env)
+                  :var (make-variable var) :len (parse-form len env type-env)
                   :body (parse-seq body (acons var lvar env))))))
            ((case case!)
             (destructuring-bind (value &rest cases) args
               (when (null cases)
                 (error "Empty case"))
               (multiple-value-bind (def cases)
-                  (case-adt-def cases adt-env)
+                  (case-adt-def cases type-env)
                 (let ((cases
                         (loop for ((constructor . vars) . body) in cases
                               for lvars = (mapcar #'make-variable vars)
@@ -70,7 +70,7 @@
                               collect (cons (cons constructor lvars)
                                             (parse-seq body new-env)))))
                   (make-instance 'case
-                    :value (parse-form value env adt-env)
+                    :value (parse-form value env type-env)
                     :cases cases
                     :case!p (eq head 'case!)
                     :adt-def def)))))
@@ -78,22 +78,22 @@
             (destructuring-bind (spec) args
               (make-instance 'literal
                 ;; Should be a global env
-                :initializer (parse-literal spec env adt-env))))
+                :initializer (parse-literal spec env type-env))))
            (otherwise ; call
             (make-instance 'call
-              :callee (parse-form head env adt-env)
+              :callee (parse-form head env type-env)
               :args (loop for form in args
-                          collect (parse-form form env adt-env)))))))
+                          collect (parse-form form env type-env)))))))
       ;; Back to the typecase - remember that? So long ago
       (t
        (make-instance 'literal
-         :initializer (parse-literal form env adt-env))))))
+         :initializer (parse-literal form env type-env))))))
 
 ;;; Given the ((constructor var*) . ast)* list from a case,
 ;;; return the appropriate adt def, and order the cases to match the def.
-(defun case-adt-def (cases adt-env)
+(defun case-adt-def (cases type-env)
   (let* ((constructors (mapcar #'caar cases))
-         (def (find-adt-def-from-constructor (first constructors) adt-env))
+         (def (find-adt-def-from-constructor (first constructors) type-env))
          (oconstructors (constructors def)))
     (unless (null (set-exclusive-or constructors oconstructors :test #'eq))
       ;; FIXME: improve message

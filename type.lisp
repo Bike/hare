@@ -339,16 +339,13 @@ available; their values as integers are not defined.
 ;;;
 ;;; Parsing types.
 
-;;; "Environments" are alists (symbol . type).
-;;; ADT environments are as in env.lisp.
-(defun parse-type (expr env adt-env)
+;;; Type environments are as in env.lisp.
+(defun parse-type (expr type-env)
   (etypecase expr
-    (symbol ; must be an alias.
-     (let ((pair (assoc expr env)))
-       (if pair
-           (cdr pair)
-           ;; "foo" can be short for "(foo)"
-           (make-adt (find-adt-def expr adt-env) nil))))
+    (symbol ; alias or zero-arg adt.
+     (or (find-type expr type-env)
+         ;; "foo" can be short for "(foo)"
+         (make-adt (find-adt-def expr adt-env) nil)))
     (cons
      (cl:case (car expr)
        ((int)
@@ -357,16 +354,16 @@ available; their values as integers are not defined.
           (make-int len)))
        ((pointer)
         (destructuring-bind (under) (cdr expr)
-          (make-pointer (parse-type under env adt-env))))
+          (make-pointer (parse-type under type-env))))
        ((array)
         (destructuring-bind (et) (cdr expr)
-          (make-arrayt (parse-type et env adt-env))))
+          (make-arrayt (parse-type et type-env))))
        ((function)
         (destructuring-bind (ret &rest params) (cdr expr)
-          (make-fun (parse-type ret env adt-env)
+          (make-fun (parse-type ret type-env)
                     (loop for param in params
-                          collect (parse-type param env adt-env)))))
+                          collect (parse-type param type-env)))))
        (otherwise
         (make-adt (find-adt-def (car expr) adt-env)
                   (loop for type in (cdr expr)
-                        collect (parse-type type env adt-env))))))))
+                        collect (parse-type type type-env))))))))

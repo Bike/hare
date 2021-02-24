@@ -27,11 +27,11 @@
 (defun parse-defadt (adt-def form adt-env)
   (destructuring-bind (defadt name tvars &rest members) form
     (declare (ignore defadt name)) ; handled already
-    (let ((env (mapcar #'cons tvars (tvars adt-def))))
+    (let ((env (augment-type-env adt-env tvars (tvars adt-def))))
       (loop for (constructor . types) in members
             collect constructor into constructors
             collect (loop for type in types
-                          collect (parse-type type env adt-env))
+                          collect (parse-type type adt-env))
               into adt-members
             finally (setf (constructors adt-def) constructors
                           (members adt-def) adt-members))))
@@ -40,7 +40,7 @@
 ;;; Input is a list of (defadt name (tvar*) (constructor type*)*) forms.
 ;;; Return an adt environment.
 (defun parse-defadts (forms)
-  (loop with adt-env = (make-adt-env)
+  (loop with adt-env = (make-type-env)
         for form in forms
         for name = (second form)
         for vars = (third form)
@@ -101,31 +101,31 @@
         collect (make-instance 'variable :name name) into vars
         finally (return (make-env names vars))))
 
-(defun parse-export (decl var-env type-env adt-env)
+(defun parse-export (decl var-env type-env)
   (destructuring-bind (export name type c-name)
       decl
     (declare (ignore export))
     (check-type name symbol)
     (check-type c-name string)
-    (list (lookup name var-env) (parse-type type type-env adt-env) c-name)))
+    (list (lookup name var-env) (parse-type type type-env) c-name)))
 
-(defun parse-exports (decls var-env type-env adt-env)
+(defun parse-exports (decls var-env type-env)
   (loop for decl in decls
-        collect (parse-export decl var-env type-env adt-env)))
+        collect (parse-export decl var-env type-env)))
 
-(defun parse-extern (decl var-env type-env adt-env)
+(defun parse-extern (decl var-env type-env)
   (destructuring-bind (extern name type c-name)
       decl
     (declare (ignore extern))
     (check-type name symbol)
     (check-type c-name string)
     (list (lookup name var-env)
-          (parse-type type type-env adt-env)
+          (parse-type type type-env)
           c-name)))
 
-(defun parse-externs (decls var-env type-env adt-env)
+(defun parse-externs (decls var-env type-env)
   (loop for decl in decls
-        collect (parse-extern decl var-env type-env adt-env)))
+        collect (parse-extern decl var-env type-env)))
 
 (defun divide-toplevel-forms (forms)
   (let (defadts defvars defconstants exports externs)
@@ -147,9 +147,9 @@
       (divide-toplevel-forms forms)
     (let* ((adt-env (parse-defadts defadts))
            (env (initial-env (append defvars externs)))
-           (pexterns (parse-externs externs env nil adt-env))
+           (pexterns (parse-externs externs env adt-env))
            (cenv (parse-defconstants defconstants env adt-env))
-           (exports (parse-exports exports env nil adt-env))
+           (exports (parse-exports exports env adt-env))
            (bindings (make-bindings defvars cenv adt-env)))
       (make-instance 'module
         :adt-env adt-env

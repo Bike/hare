@@ -98,7 +98,7 @@
 ;;; Parsing
 ;;;
 
-(defun parse-literal (literal env adt-env)
+(defun parse-literal (literal env type-env)
   (etypecase literal
     ((integer 0) (make-instance 'integer-initializer :value literal))
     ((or (cons (member array arrayn bytes lambda)) (eql undef))
@@ -106,13 +106,13 @@
     (symbol (lookup literal env))
     (cons ; constructor
      (let* ((constructor (car literal)) (fields (cdr literal))
-            (def (find-adt-def constructor adt-env)))
+            (def (find-adt-def constructor type-env)))
        (make-instance 'constructor-initializer
          :def def :constructor constructor
          :fields (loop for field in fields
-                       collect (parse-literal field env adt-env)))))))
+                       collect (parse-literal field env type-env)))))))
 
-(defun parse-initializer (initializer env adt-env)
+(defun parse-initializer (initializer env type-env)
   (etypecase initializer
     ((integer 0) (make-instance 'integer-initializer :value initializer))
     ((eql undef) (undef))
@@ -120,23 +120,23 @@
      (make-instance 'variable-initializer :variable (lookup initializer env)))
     ((cons (eql lambda))
      (parse-lambda (cadr initializer) (cddr initializer)
-                   env adt-env))
+                   env type-env))
     ((cons (member array arrayn bytes))
      (error "Not implemented yet: ~a" (car initializer)))
     (cons ; constructor
      (let* ((constructor (car initializer)) (fields (cdr initializer))
-            (def (find-adt-def-from-constructor constructor adt-env)))
+            (def (find-adt-def-from-constructor constructor type-env)))
        (make-instance 'constructor-initializer
          :def def :constructor constructor
          :fields (loop for field in fields
-                       collect (parse-initializer field env adt-env)))))))
+                       collect (parse-initializer field env type-env)))))))
 
-(defun parse-lambda (params forms env adt-env)
+(defun parse-lambda (params forms env type-env)
   (let* ((vars (mapcar #'make-variable params))
          (env (make-env params vars env)))
     (make-instance 'lambda-initializer
       :params vars
-      :body (parse-form `(seq ,@forms) env adt-env))))
+      :body (parse-form `(seq ,@forms) env type-env))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
