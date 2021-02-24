@@ -12,17 +12,16 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
 
 |#
 
-(defclass variable ()
-  ((%name :accessor name :initarg :name :type symbol)))
-(defun make-variable (name)
-  (check-type name symbol)
-  (make-instance 'variable :name name))
+;;; The class of things stored in these environments.
+(defclass info () ())
 
-(defmethod print-object ((o variable) s)
-  (print-unreadable-object (o s :type t)
-    (write (name o) :stream s)))
+(defclass variable-info (info)
+  ((%variable :initarg :variable :reader variable)))
 
-;;; initializers are defined in literals.lisp
+(defclass constant-info (info)
+  ((%initializer :initarg :initializer :reader initializer)))
+
+(defclass special-operator-info (info) ())
 
 (defclass environment ()
   (;; An alist.

@@ -16,77 +16,102 @@
         collect (convert form env type-env)))
 
 (defun convert-symbol (symbol env type-env)
-  (let ((thing (lookup form env)))
-    (etypecase thing
-      (variable (make-instance 'reference :variable thing))
-      (initializer (make-instance 'literal :initializer thing)))))
+  (declare (ignore type-env))
+  (let ((info (lookup symbol env)))
+    (etypecase info
+      (variable-info (make-instance 'reference :variable (variable info)))
+      (constant-info
+       (make-instance 'literal :initializer (initializer info))))))
 
 (defun convert-cons (head args env type-env)
-  (cl:case head
-    ((seq) (convertlis args env type-env))
-    ((let)
-     (destructuring-bind ((var value) &rest body) args
-       (let* ((lvar (make-variable var))
-              (new-env (make-env (list var) (list lvar) env)))
-         (make-instance 'bind
-           :var lvar :value (convert value env type-env)
-           :body (convertlis body new-env type-env)))))
-    ((if)
-     (destructuring-bind (test then else) args
-       (make-instance 'branch
-         :test (convert test env type-env)
-         :then (convert then env type-env)
-         :else (convert else env type-env))))
-    ((with)
-     (destructuring-bind ((var &optional (initializer nil initializerp))
-                          &rest body)
-         args
-       (let ((lvar (make-variable var))
-             (initializer
-               (if initializerp
-                   ;; FIXME: Should be a global env probably
-                   (parse-initializer initializer env type-env)
-                   (undef))))
-         (make-instance 'with
-           :var lvar
-           :initialization (make-instance 'initialization
-                             :initializer initializer)
-           :body (convertlis
-                  body (make-env (list var) (list lvar) env) type-env)))))
-    #+(or)
-    ((with-array)
-     (destructuring-bind ((var len) &rest body) args
-       (let ((lvar (make-variable var)))
-         (make-instance 'with
-           :var (make-variable var) :len (convert len env type-env)
-           :body (convert body (acons var lvar env) type-env)))))
-    ((case case!)
-     (destructuring-bind (value &rest cases) args
-       (when (null cases)
-         (error "Empty case"))
-       (multiple-value-bind (def cases)
-           (case-adt-def cases type-env)
-         (let ((cases
-                 (loop for ((constructor . vars) . body) in cases
+  (if (symbolp head)
+      (let ((info (lookup head env)))
+        (etypecase info
+          (variable-info ; ordinary function call
+           (make-instance 'call
+             :callee (variable info)
+             :args (convertlis args env type-env)))
+          (special-operator-info
+           (convert-special head args env type-env))))
+      ;; ordinary function call with complex evaluation of the function
+      (make-instance 'call
+        :callee (convert head env type-env)
+        :args (convertlis args env type-env))))
+
+(defgeneric convert-special (operator rest env type-env))
+
+(defmethod convert-special ((operator (eql 'seq)) rest env type-env)
+  (make-instance 'seq :asts (convertlis rest env type-env)))
+
+(defmethod convert-special ((operator (eql 'let)) rest env type-env)
+  (destructuring-bind ((varname value) &rest body) rest
+    (let* ((lvar (make-variable varname))
+           (info (make-instance 'variable-info :variable lvar))
+           (new-env (make-env (list varname) (list info) env)))
+      (make-instance 'bind
+        :var lvar :value (convert value env type-env)
+        :body (convertlis body new-env type-env)))))
+
+(defmethod convert-special ((operator (eql 'if)) rest env type-env)
+  (destructuring-bind (test then else) rest
+    (make-instance 'branch
+      :test (convert test env type-env)
+      :then (convert then env type-env)
+      :else (convert else env type-env))))
+
+(defmethod convert-special ((operator (eql 'with)) rest env type-env)
+  (destructuring-bind ((var &optional (initializer nil initializerp))
+                       &rest body)
+      rest
+    (let* ((lvar (make-variable var))
+           (info (make-instance 'variable-info :variable lvar))
+           (initializer
+             (if initializerp
+                 ;; FIXME: Should be a global env probably
+                 (parse-initializer initializer env type-env)
+                 (undef))))
+      (make-instance 'with
+        :var lvar
+        :initialization (make-instance 'initialization
+                          :initializer initializer)
+        :body (convertlis
+               body (make-env (list var) (list info) env) type-env)))))
+#+(or)
+(defmethod convert-special ((operator (eql 'with-array)) rest env type-env)
+  (destructuring-bind ((var len) &rest body) rest
+    (let ((lvar (make-variable var)))
+      (make-instance 'with
+        :var (make-variable var) :len (convert len env type-env)
+        :body (convert body (acons var lvar env) type-env)))))
+
+(defun convert-case (head args env type-env)
+  (destructuring-bind (value &rest cases) args
+    (when (null cases)
+      (error "Empty case"))
+    (multiple-value-bind (def cases)
+        (case-adt-def cases type-env)
+      (let ((cases
+              (loop for ((constructor . vars) . body) in cases
                        for lvars = (mapcar #'make-variable vars)
-                       for new-env = (make-env vars lvars env)
-                       collect (cons (cons constructor lvars)
-                                     (convertlis body new-env type-env)))))
-           (make-instance 'case
-             :value (convert value env type-env)
-             :cases cases
-             :case!p (eq head 'case!)
-             :adt-def def)))))
-    ((quote)
-     (destructuring-bind (spec) args
-       (make-instance 'literal
-         ;; Should be a global env
-         :initializer (parse-literal spec env type-env))))
-    (otherwise ; call
-     (make-instance 'call
-       :callee (convert head env type-env)
-       :args (loop for form in args
-                   collect (convert form env type-env))))))
+                    for new-env = (make-env vars lvars env)
+                    collect (cons (cons constructor lvars)
+                                  (convertlis body new-env type-env)))))
+        (make-instance 'case
+          :value (convert value env type-env)
+          :cases cases
+          :case!p (eq head 'case!)
+          :adt-def def)))))
+
+(defmethod convert-special ((operator (eql 'case)) args env type-env)
+  (convert-case operator args env type-env))
+(defmethod convert-special ((operator (eql 'case!)) args env type-env)
+  (convert-case operator args env type-env))
+
+(defmethod convert-special ((operator (eql 'quote)) args env type-env)
+  (destructuring-bind (spec) args
+    (make-instance 'literal
+      ;; FIXME: Should be a global env
+      :initializer (parse-literal spec env type-env))))
 
 (defun convert-literal (form env type-env)
   (make-instance 'literal

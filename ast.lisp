@@ -101,6 +101,16 @@ Forces the pointer to point to the particular constructor type, as expected.
 (defmethod map-ast (function (ast literal))
   (make-instance 'literal :initializer (initializer ast)))
 
+(defclass variable ()
+  ((%name :accessor name :initarg :name :type symbol)))
+(defun make-variable (name)
+  (check-type name symbol)
+  (make-instance 'variable :name name))
+
+(defmethod print-object ((o variable) s)
+  (print-unreadable-object (o s :type t)
+    (write (name o) :stream s)))
+
 ;;; Separate from variables for the same reason.
 (defclass reference (ast)
   ((%variable :initarg :variable :accessor variable :type variable)))
