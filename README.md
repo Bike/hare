@@ -12,8 +12,12 @@ In flux.
 ```
 module := definition*
 definition := defconstant | defvar | defadt
-type := tvar | (INT integer) | (POINTER type) | (FUNCTION type type*) | (ARRAY type) |
-        (adt-name type*)
+type := tvar
+      | (INT integer)
+      | (POINTER type)
+      | (FUNCTION type type*)
+      | (ARRAY type)
+      | (adt-name type*)
 tvar := symbol
 adt-name := symbol
 defadt := (DEFADT adt-name (tvar*) (constructor type*)*)
@@ -21,16 +25,17 @@ defconstant := (DEFCONSTANT name initializer)
 defvar := (DEFVAR name [initializer])
 name := symbol
 constructor := symbol
-initializer := symbol | integer | UNDEF | (ARRAY initializer*) |
-               (ARRAYN integer) | (BYTES initializer) | (constructor initializer*) |
-               (LAMBDA (name*) form*)
+initializer := symbol | integer | UNDEF | (ARRAY initializer*)
+             | (ARRAYN integer) | (BYTES initializer)
+             | (constructor initializer*)
+             | (LAMBDA (name*) form*)
 form := name | combination | literal
 literal := name | (constructor literal*)
-combination := (LET (name form) form*) | (IF form form form) | (SEQ form*) |
-               (CASE form ((constructor name*) form*)*) |
-               (CASE! form ((constructor name*) form*)*) |
-               (WITH (name [initializer]) form*) |
-               call
+combination := (LET (name form) form*) | (IF form form form) | (SEQ form*)
+             | (CASE form ((constructor name*) form*)*)
+             | (CASE! form ((constructor name*) form*)*)
+             | (WITH (name [initializer]) form*)
+             | call
 call := (form form*)
 ```
 
