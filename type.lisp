@@ -255,6 +255,8 @@ available; their values as integers are not defined.
    ;; A proper list of CONSTRUCTORs
    (%constructors :initarg :constructors :accessor constructors :type list)))
 
+(defun arity (adt-def) (length (tvars adt-def)))
+
 ;;; E.g., if we have (defadt foo (x) ...), and then refer to (foo (int 3))
 ;;; somewhere, we have one of these, with args = ((int 3)) but it's a type.
 ;;; In type theory this is more often called TApp or the like.
@@ -341,36 +343,3 @@ available; their values as integers are not defined.
   (let ((map (loop for tvar in (tvars schema)
                    collect (cons tvar (make-tvar (name tvar))))))
     (subst-type map (type schema))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Parsing types.
-
-;;; Type environments are as in type-env.lisp.
-(defun parse-type (expr type-env)
-  (etypecase expr
-    (symbol ; alias or zero-arg adt.
-     (or (find-type expr type-env)
-         ;; "foo" can be short for "(foo)"
-         (make-adt (find-adt-def expr adt-env) nil)))
-    (cons
-     (cl:case (car expr)
-       ((int)
-        (destructuring-bind (len) (cdr expr)
-          (check-type len (integer 0))
-          (make-int len)))
-       ((pointer)
-        (destructuring-bind (under) (cdr expr)
-          (make-pointer (parse-type under type-env))))
-       ((array)
-        (destructuring-bind (et) (cdr expr)
-          (make-arrayt (parse-type et type-env))))
-       ((function)
-        (destructuring-bind (ret &rest params) (cdr expr)
-          (make-fun (parse-type ret type-env)
-                    (loop for param in params
-                          collect (parse-type param type-env)))))
-       (otherwise
-        (make-adt (find-adt-def (car expr) adt-env)
-                  (loop for type in (cdr expr)
-                        collect (parse-type type type-env))))))))
