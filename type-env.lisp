@@ -22,6 +22,9 @@ and ADD-TYPE modify one.
 (defun find-alias (name type-env)
   (values (cdr (assoc name (aliases type-env)))))
 
+(defun add-alias (name params expansion type-env)
+  (push (list name params expansion) type-env))
+
 (defun find-adt-def (name type-env)
   (or (gethash name (by-name type-env)) (error 'unknown-adt :name name)))
 

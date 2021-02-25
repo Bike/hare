@@ -131,7 +131,9 @@
          (params (tvars pre-def))
          (type-env (type-env pre-module))
          (internal-type-env
-           (augment-type-env type-env (mapcar #'name params) params))
+           (augment-type-env type-env
+                             (loop for param in params
+                                   collect (list (name param) () param))))
          (fieldses
            (loop for expr in exprs
                  collect (loop for field in expr
@@ -152,3 +154,21 @@
     (append (phase0-type-dependencies pre-module name)
             (loop for cname in cnames
                   nconc (phase0-initop-dependencies pre-module cname)))))
+
+(defun parse-deftype (pre-module expr)
+  (declare (ignore pre-module))
+  (destructuring-bind (name (&rest tvarnames) utype) (rest expr)
+    (make-instance 'tldeftype
+      :name name :parameters (mapcar #'make-tvar tvarnames) :expr utype)))
+
+(defmethod phase0parse ((tl tldeftype) pre-module)
+  (setf (waiting-on-types tl) nil)
+  (let* ((name (name tl)) (tvars (parameters tl)) (expr (expr tl))
+         (type-env (type-env pre-module))
+         (expansion
+           (handler-case (parse-type expr type-env)
+             (unknown-adt (e)
+               (push (name e) (waiting-on-types tl))
+               (return-from phase0parse nil)))))
+    (add-alias name tvars expansion type-env)
+    (phase0-type-dependencies pre-module name)))
