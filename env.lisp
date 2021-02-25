@@ -39,6 +39,9 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
         (cdr pair)
         (error 'variable-unbound :name name))))
 
+(defun forgiving-lookup (name environment)
+  (cdr (assoc name (bindings environment) :test #'eq)))
+
 (defun (setf lookup) (new name environment)
   (let ((pair (assoc name (bindings environment) :test #'eq)))
     (if pair

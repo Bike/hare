@@ -83,9 +83,12 @@
                (push (name e) (waiting-on-initops tl))
                (return-from phase0parse nil))))
          ;; success
-         (info (make-instance 'constant-info :initializer literal)))
-    (setf (lookup name (environment pre-module)) info
-          (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+         (env (environment pre-module))
+         (old-info (forgiving-lookup name env)))
+    (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+    (etypecase old-info
+      (null (setf (lookup name env)
+                  (make-instance 'constant-info :initializer literal))))
     (phase0-var-dependencies pre-module name)))
 
 (defun parse-defvar (pre-module expr)
@@ -114,10 +117,13 @@
                (push (name e) (waiting-on-initops tl))
                (return-from phase0parse nil))))
          (variable (make-variable name))
-         (info (make-instance 'variable-info
-                 :variable (make-variable name))))
-    (setf (lookup name (environment pre-module)) info
-          (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+         (env (environment pre-module))
+         (old-info (forgiving-lookup name env)))
+    (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+    (etypecase old-info
+      (variable-info)
+      (null (setf (lookup name env) (make-instance 'variable-info
+                                      :variable (make-variable name)))))
     (push (cons variable initializer) (varbinds pre-module))
     (phase0-var-dependencies pre-module name)))
 
