@@ -21,6 +21,12 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
 (defclass constant-info (info)
   ((%initializer :initarg :initializer :accessor initializer)))
 
+(defclass macro-info (info)
+  ((%expander :initarg :expander :reader expander)))
+
+(defclass symbol-macro-info (info)
+  ((%expander :initarg :expander :reader expander)))
+
 (defclass special-operator-info (info) ())
 
 (defclass environment ()

@@ -16,12 +16,13 @@
         collect (convert form env type-env)))
 
 (defun convert-symbol (symbol env type-env)
-  (declare (ignore type-env))
   (let ((info (lookup symbol env)))
     (etypecase info
       (variable-info (make-instance 'reference :variable (variable info)))
       (constant-info
-       (make-instance 'literal :initializer (initializer info))))))
+       (make-instance 'literal :initializer (initializer info)))
+      (symbol-macro-info
+       (convert (funcall (expander info) symbol env) env type-env)))))
 
 (defun convert-cons (head args env type-env)
   (if (symbolp head)
@@ -31,6 +32,12 @@
            (make-instance 'call
              :callee (variable info)
              :args (convertlis args env type-env)))
+          (symbol-macro-info
+           (convert-cons (funcall (expander info) head env)
+                         args env type-env))
+          (macro-info
+           (convert (funcall (expander info) (cons head args) env)
+                    env type-env))
           (special-operator-info
            (convert-special head args env type-env))))
       ;; ordinary function call with complex evaluation of the function
