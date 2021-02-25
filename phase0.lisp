@@ -50,6 +50,16 @@
    (%parameters :initarg :parameters :reader parameters :type list)
    (%expr :initarg :expr :reader expr)))
 
+(defclass tldefmacro (toplevel)
+  ((%name :initarg :name :reader name :type symbol)
+   ;; A macro lambda list. mll = (or null symbol (cons mll mll))
+   (%mll :initarg :mll :reader mll)
+   (%expr :initarg :expr :reader expr)))
+
+(defclass tldefine-symbol-macro (toplevel)
+  ((%name :initarg :name :reader name :type symbol)
+   (%expr :initarg :expr :reader expr)))
+
 (defclass tlunknown (toplevel)
   ((%waiting-on-tlop :initarg :waiting-on-tlop
                      :reader waiting-on-tlop :type symbol)

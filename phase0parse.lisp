@@ -171,4 +171,55 @@
                (push (name e) (waiting-on-types tl))
                (return-from phase0parse nil)))))
     (add-alias name tvars expansion type-env)
+    (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
     (phase0-type-dependencies pre-module name)))
+
+(defun parse-defmacro (pre-module expr)
+  (declare (ignore pre-module))
+  (destructuring-bind (name macro-lambda-list &body body) (rest expr)
+    (make-instance 'tldefmacro :name name :mll macro-lambda-list :expr body)))
+
+(defmacro destructure-mll (macro-lambda-list object body)
+  (labels ((bindings (mll argvar)
+             (etypecase mll
+               (symbol `((,mll ,argvar)))
+               (null nil)
+               (cons (let ((carvar (gensym "CAR")) (cdrvar (gensym "CDR")))
+                       `((,carvar (car ,argvar))
+                         ,@(bindings (car mll) carvar)
+                         (,cdrvar (cdr ,argvar))
+                         ,@(bindings (cdr mll) cdrvar)))))))
+    (let ((gobj (gensym "OBJECT")))
+      `(let* ((,gobj ,object)
+              ,@(bindings macro-lambda-list gobj))
+         ,@body))))
+
+(defun parse-macro (name macro-lambda-list body)
+  (let ((gform (gensym "FORM")) (genv (gensym "ENV")))
+    `(lambda (,gform ,genv)
+       (declare (ignore ,genv))
+       (block ,name
+         (destructure-mll ,macro-lambda-list ,gform ,@body)))))
+
+(defmethod phase0parse ((tl tldefmacro) pre-module)
+  ;; not dependent on anything
+  (let* ((name (name tl)) (mll (mll tl)) (body (expr tl))
+         (expander (coerce (parse-macro name mll body) 'function))
+         (info (make-instance 'macro-info :expander expander)))
+    (setf (lookup name (environment pre-module)) info
+          (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+    (phase0-var-dependencies pre-module name)))
+
+(defun parse-define-symbol-macro (pre-module expr)
+  (declare (ignore pre-module))
+  (destructuring-bind (name expansion) (rest expr)
+    (make-instance 'tldefine-symbol-macro :name name :expr expansion)))
+
+(defmethod phase0parse ((tl tldefine-symbol-macro) pre-module)
+  ;; also independent
+  (let* ((name (name tl)) (expansion (expr tl))
+         (expander (lambda (form env) (declare (ignore form env)) expansion))
+         (info (make-instance 'symbol-macro-info :expander expander)))
+    (setf (lookup name (environment pre-module)) info
+          (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+    (phase0-var-dependencies pre-module name)))
