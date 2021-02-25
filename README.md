@@ -18,7 +18,7 @@ type := tvar
       | (POINTER type)
       | (FUNCTION type type*)
       | (ARRAY type)
-      | (adt-name type*)
+      | (type-name type*)
 tvar := symbol
 type-name := symbol
 defadt := (DEFADT type-name (tvar*) (constructor type*)*)
@@ -26,7 +26,9 @@ deftype := (DEFTYPE type-name (tvar*) type)
 defconstant := (DEFCONSTANT name initializer)
 defvar := (DEFVAR name [initializer])
 declaim := (DECLAIM declamation*)
-declamation := (TYPE type name*) ; more to come
+declamation := (TYPE type name*)
+             | (VARIABLE name*)
+             | (THREAD-LOCAL name*) ; maybe someday
 defmacro := (DEFMACRO name macro-lambda-list macro-form*)
 define-symbol-macro := (DEFINE-SYMBOL-MACRO name form)
 define-tl-macro := (DEFINE-TOPLEVEL-MACRO name macro-lambda-list macro-form*)

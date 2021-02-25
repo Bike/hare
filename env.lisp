@@ -15,16 +15,20 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
 ;;; The class of things stored in these environments.
 (defclass info () ())
 
-(defclass variable-info (info)
+(defclass decltype-mixin (info)
+  (;; A SCHEMA or NIL, but I don't want to have to depend on type.lisp
+   (%declared-type :initarg :type :initform nil :reader declared-type)))
+
+(defclass variable-info (decltype-mixin info)
   ((%variable :initarg :variable :reader variable)))
 
-(defclass constant-info (info)
+(defclass constant-info (decltype-mixin info)
   ((%initializer :initarg :initializer :accessor initializer)))
 
 (defclass macro-info (info)
   ((%expander :initarg :expander :reader expander)))
 
-(defclass symbol-macro-info (info)
+(defclass symbol-macro-info (decltype-mixin info)
   ((%expander :initarg :expander :reader expander)))
 
 (defclass special-operator-info (info) ())
