@@ -2,7 +2,7 @@
 
 #|
 These have bindings from names in the ADT namespace and constructor namespace
-to adt-defs, and from names in the type namespace to types.
+to adt-defs, and alias mappings.
 
 The functions FIND-ADT-DEF and FIND-ADT-DEF-FROM-CONSTRUCTOR are available,
 as well as FIND-TYPE. MAKE-TYPE-ENV makes an empty environment and ADD-ADT-DEF
@@ -10,17 +10,17 @@ and ADD-TYPE modify one.
 |#
 
 (defclass type-env ()
-  (;; Type aliases. Alist (name . type)
-   (%types :initform (make-hash-table :test #'eq) :accessor types
-           :type list)
+  (;; Type aliases. List of (name (tvar*) type)
+   (%aliases :initform (make-hash-table :test #'eq) :accessor aliases
+             :type list)
    ;; ADTs
    (%by-name :initform (make-hash-table :test #'eq) :accessor by-name
              :type hash-table)
    (%by-constructor :initform (make-hash-table :test #'eq)
                     :accessor by-constructor :type hash-table)))
 
-(defun find-type (name type-env)
-  (values (cdr (assoc name (types type-env)))))
+(defun find-alias (name type-env)
+  (values (cdr (assoc name (aliases type-env)))))
 
 (defun find-adt-def (name type-env)
   (or (gethash name (by-name type-env)) (error 'unknown-adt :name name)))
@@ -32,10 +32,10 @@ and ADD-TYPE modify one.
 (defun make-type-env () (make-instance 'type-env))
 
 ;; Return a new type-env with additional name->type mapping.
-(defun augment-type-env (type-env names types)
+(defun augment-type-env (type-env aliases)
   (make-instance 'type-env
     :by-name (by-name type-env) :by-constructor (by-constructor type-env)
-    :types (append (mapcar #'cons names types) (types type-env))))
+    :aliases (append aliases (aliases type-env))))
 
 ;; Add an adt-def that may only have its name to the environment.
 (defun add-adt-def (adt-def type-env)

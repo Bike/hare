@@ -4,11 +4,14 @@
 (defun parse-type (expr type-env)
   (etypecase expr
     (symbol ; alias or zero-arg adt.
-     (or (find-type expr type-env)
-         ;; "foo" can be short for "(foo)"
-         (let ((adt-def (find-adt-def expr type-env)))
-           (assert (zerop (arity adt-def)))
-           (make-adt adt-def nil))))
+     (let ((alias (find-alias expr type-env)))
+       (if alias
+           (progn (assert (null (first alias)))
+                  (second alias))
+           ;; "foo" can be short for "(foo)"
+           (let ((adt-def (find-adt-def expr type-env)))
+             (assert (zerop (arity adt-def)))
+             (make-adt adt-def nil)))))
     (cons
      (cl:case (car expr)
        ((int)
@@ -27,8 +30,14 @@
                     (loop for param in params
                           collect (parse-type param type-env)))))
        (otherwise
-        (let ((adt-def (find-adt-def (car expr) type-env)))
-          (assert (= (arity adt-def) (length (cdr expr))))
-          (make-adt adt-def
-                    (loop for type in (cdr expr)
-                          collect (parse-type type type-env)))))))))
+        (let ((alias (find-alias (car expr) type-env))
+              (rest (loop for type in (cdr expr)
+                          collect (parse-type type type-env))))
+          (if alias
+              (progn
+                (assert (= (length rest) (length (first alias))))
+                (subst-type
+                 (mapcar #'cons (first alias) rest) (second alias)))
+              (let ((adt-def (find-adt-def (car expr) type-env)))
+                (assert (= (arity adt-def) (length rest)))
+                (make-adt adt-def rest)))))))))
