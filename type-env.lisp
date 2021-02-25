@@ -23,12 +23,11 @@ and ADD-TYPE modify one.
   (values (cdr (assoc name (types type-env)))))
 
 (defun find-adt-def (name type-env)
-  (or (gethash name (by-name type-env))
-      (error "Unknown ADT: ~a" name)))
+  (or (gethash name (by-name type-env)) (error 'unknown-adt :name name)))
 
 (defun find-adt-def-from-constructor (constructor type-env)
   (or (gethash constructor (by-constructor type-env))
-      (error "Unknown constructor: ~a" constructor)))
+      (error 'unknown-constructor :name constructor)))
 
 (defun make-type-env () (make-instance 'type-env))
 

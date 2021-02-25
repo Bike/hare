@@ -11,7 +11,8 @@ In flux.
 
 ```
 module := definition*
-definition := defconstant | defvar | defadt
+definition := defconstant | defvar | defadt | deftype | declaim
+            | defmacro | define-symbol-macro | define-tl-macro
 type := tvar
       | (INT integer)
       | (POINTER type)
@@ -19,10 +20,18 @@ type := tvar
       | (ARRAY type)
       | (adt-name type*)
 tvar := symbol
-adt-name := symbol
-defadt := (DEFADT adt-name (tvar*) (constructor type*)*)
+type-name := symbol
+defadt := (DEFADT type-name (tvar*) (constructor type*)*)
+deftype := (DEFTYPE type-name (tvar*) type)
 defconstant := (DEFCONSTANT name initializer)
 defvar := (DEFVAR name [initializer])
+declaim := (DECLAIM declamation*)
+declamation := (TYPE type name*) ; more to come
+defmacro := (DEFMACRO name macro-lambda-list macro-form*)
+define-symbol-macro := (DEFINE-SYMBOL-MACRO name form)
+define-tl-macro := (DEFINE-TL-MACRO name macro-lambda-list macro-form*)
+macro-lambda-list := symbol | (macro-lambda-list . macro-lambda-list)
+macro-form := cl-form ; as in, a common lisp form
 name := symbol
 constructor := symbol
 initializer := symbol | integer | UNDEF | (ARRAY initializer*)
@@ -30,7 +39,7 @@ initializer := symbol | integer | UNDEF | (ARRAY initializer*)
              | (constructor initializer*)
              | (LAMBDA (name*) form*)
 form := name | combination | literal
-literal := name | (constructor literal*)
+literal := name | integer | (constructor literal*)
 combination := (LET (name form) form*) | (IF form form form) | (SEQ form*)
              | (CASE form ((constructor name*) form*)*)
              | (CASE! form ((constructor name*) form*)*)
@@ -44,19 +53,16 @@ See literals.lisp, types.lisp, and ast.lisp for explanations of the literal/init
 Compilation semantics
 ---------------------
 
-C defines things in terms of translation phases so let's do that.
+C defines things in terms of translation phases so let's do that. Unlike C, we skip the parsing steps and assume you have an IR of some kind. Each IR entity corresponds to a top level form in a source file.
 
-1. You start out with ASTs of some kind. These can be translated to a "module". A module contains polymorphic definitions, as well as things only of interest to a compiler, such as constants, macro definitions, type definitions, and extern declarations (i.e. a notice that a given name will eventually be linked in as having some type).
-2. A module can be translated into an "object", like a binary. An object does not (in general) have macro definitions or constants. Everything is monotyped. This means any given polymorphic definition has been "instantiated" as one or more monomorphic definitions. Definitions are distinguished by some form of name mangling, unless I can figure out how to make a linker behave pretty damn exotically.
+0. To begin with, your IR is not fully realized. Some expressions may not be fully macroexpanded, and not all names referred to have any known information. Each "pre-module" in this state consists of an unorderd set of IR entities, each of which may define a macro or constant, give information about a variable, or be an unexpanded presumed-macro.
+1. In phase 1, pre-modules are combined together until are macros are expanded and all names have been understood. "Understanding" a name could just mean knowing that it names a variable; the actual module that defines the variable does not have to be present. You now have a "module". A module consists essentially of an unordered set of definitions of variables, where each definition is essentially a (possibly degenerate) template, but also contains macro definitions, etc. as more pre-modules can be combined in (which can revert the phase).
+2. In phase 2, a module is "manifested". Templates are expanded until everything is monotyped. At this point, enough information is available that machine code can be generated for all functions. Definitions are distinguished by some form of name mangling, unless I can figure out how to make a linker behave pretty damn exotically.
 3. Objects are linked together etc. ditto C.
 
-A "module" is analogous to a C header, but it can contain structured information rather than text.
-
-Phase 2 essentially strips out defconstant and defadt forms, at least to the point of making them irrelevant. Each defvar defines one (or more) regions of memory accessible through the symbol table.
+"pre-modules" and "modules" are analogous to C headers, but can contain structured information rather than text.
 
 Text format is not really specified so far. I would especially like to be able to produce an object file without any actual starting text, i.e. producing in-memory AST structures by whatever means. Text is not really an efficient way to deal with programs, and also I don't want to deal with encodings very much.
-
-Macros I haven't thought too much about. Ideally they would be in a more abstract language. Might be good to add another phase for removing any macro definitions written in some other language, so the compiler can focus.
 
 To-do list
 ----------

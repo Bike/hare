@@ -13,5 +13,10 @@
    (:file "ast" :depends-on ("type" "env" "packages"))
    (:file "literal" :depends-on ("type-env" "env" "packages"))
    (:file "generate-ast" :depends-on ("literal" "type" "env" "packages"))
+   (:file "phase0" :depends-on ("type" "env" "packages"))
+   (:file "phase0parse" :depends-on ("phase0" "env" "type-env" "type"
+                                              "literal" "packages"))
+   #+(or)
    (:file "infer" :depends-on ("type" "literal" "ast" "packages"))
+   #+(or)
    (:file "module" :depends-on ("parse-type" "literal" "env" "packages"))))

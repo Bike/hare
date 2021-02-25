@@ -105,7 +105,7 @@
     (symbol (lookup literal env))
     (cons ; constructor
      (let* ((constructor (car literal)) (fields (cdr literal))
-            (def (find-adt-def constructor type-env)))
+            (def (find-adt-def-from-constructor constructor type-env)))
        (make-instance 'constructor-initializer
          :def def :constructor constructor
          :fields (loop for field in fields
@@ -132,10 +132,12 @@
 
 (defun parse-lambda (params forms env type-env)
   (let* ((vars (mapcar #'make-variable params))
-         (env (make-env params vars env)))
+         (infos (loop for var in vars
+                      collect (make-instance 'variable-info :variable var)))
+         (env (make-env params infos env)))
     (make-instance 'lambda-initializer
       :params vars
-      :body (parse-form `(seq ,@forms) env type-env))))
+      :body (convert `(seq ,@forms) env type-env))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;

@@ -19,7 +19,7 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
   ((%variable :initarg :variable :reader variable)))
 
 (defclass constant-info (info)
-  ((%initializer :initarg :initializer :reader initializer)))
+  ((%initializer :initarg :initializer :accessor initializer)))
 
 (defclass special-operator-info (info) ())
 
@@ -32,6 +32,13 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
     (if pair
         (cdr pair)
         (error 'variable-unbound :name name))))
+
+(defun (setf lookup) (new name environment)
+  (let ((pair (assoc name (bindings environment) :test #'eq)))
+    (if pair
+        (setf (cdr pair) new)
+        (push (cons name new) (bindings environment))))
+  new)
 
 (defun make-env (variables values &optional parent)
   (let ((parent-bindings (if parent (bindings parent) nil)))
