@@ -10,7 +10,7 @@
         ((declaim) (parse-declaim pre-module expr))
         ((defmacro) (parse-defmacro pre-module expr))
         ((define-symbol-macro) (parse-define-symbol-macro pre-module expr))
-        ((define-tl-macro) (parse-define-tl-macro pre-module expr))
+        ((define-toplevel-macro) (parse-define-tl-macro pre-module expr))
         (otherwise
          (let* ((tlexpanders (tlexpanders pre-module))
                 (pair (assoc (car expr) tlexpanders :test #'eq)))
@@ -54,6 +54,12 @@
   (loop for tl in (toplevels pre-module)
         when (and (typep tl 'waiting-on-initops)
                   (member name (waiting-on-initops tl)))
+          collect tl))
+
+(defun phase0-tl-dependencies (pre-module name)
+  (loop for tl in (toplevels pre-module)
+        when (and (typep tl 'tlunknown)
+                  (member name (waiting-on-tlop tl)))
           collect tl))
 
 (defgeneric phase0parse (toplevel pre-module))
@@ -199,7 +205,7 @@
     `(lambda (,gform ,genv)
        (declare (ignore ,genv))
        (block ,name
-         (destructure-mll ,macro-lambda-list ,gform ,@body)))))
+         (destructure-mll ,macro-lambda-list (cdr ,gform) ,@body)))))
 
 (defmethod phase0parse ((tl tldefmacro) pre-module)
   ;; not dependent on anything
@@ -223,3 +229,27 @@
     (setf (lookup name (environment pre-module)) info
           (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
     (phase0-var-dependencies pre-module name)))
+
+(defun parse-define-tl-macro (pre-module expr)
+  (declare (ignore pre-module))
+  (destructuring-bind (name mll &body body) (rest expr)
+    (make-instance 'tldefine-tl-macro :name name :mll mll :expr body)))
+
+(defmethod phase0parse ((tl tldefine-tl-macro) pre-module)
+  ;; also independent
+  (let* ((name (name tl)) (mll (mll tl)) (body (expr tl))
+         (expander (coerce (parse-macro name mll body) 'function)))
+    (push (cons name expander) (tlexpanders pre-module))
+    (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+    (phase0-tl-dependencies pre-module name)))
+
+(defmethod phase0parse ((tl tlunknown) pre-module)
+  (let* ((expr (expr tl)) (op (car expr))
+         (pair (assoc op (tlexpanders pre-module))))
+    (when pair
+      (setf (toplevels pre-module) (delete tl (toplevels pre-module)
+                                           :test #'eq))
+      (let* ((expander (cdr pair))
+             (new (parse-toplevel pre-module (funcall expander expr))))
+        (push new (toplevels pre-module))
+        (list new)))))

@@ -10,7 +10,7 @@
    ;; An alist from VARIABLEs to INITIALIZERs.
    (%varbinds :initform nil :accessor varbinds :type list)
    ;; An alist from names to toplevel macro functions.
-   (%tlexpanders :initform nil :reader tlexpanders :type list)))
+   (%tlexpanders :initform nil :accessor tlexpanders :type list)))
 
 ;;; Representation of a toplevel expression. Abstract.
 (defclass toplevel () ())
@@ -58,6 +58,12 @@
 
 (defclass tldefine-symbol-macro (toplevel)
   ((%name :initarg :name :reader name :type symbol)
+   (%expr :initarg :expr :reader expr)))
+
+(defclass tldefine-tl-macro (toplevel)
+  ((%name :initarg :name :reader name :type symbol)
+   ;; A macro lambda list.
+   (%mll :initarg :mll :reader mll)
    (%expr :initarg :expr :reader expr)))
 
 (defclass tlunknown (toplevel)
