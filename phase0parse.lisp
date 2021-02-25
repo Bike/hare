@@ -263,3 +263,53 @@
              (new (parse-toplevel pre-module (funcall expander expr))))
         (push new (toplevels pre-module))
         (list new)))))
+
+(defun parse-declaim (pre-module expr)
+  (declare (ignore pre-module))
+  (loop with result = nil
+        for declamation in (rest expr)
+        nconc (ecase (first declamation)
+                ((type)
+                 (destructuring-bind (tvarnames type &rest names)
+                     (rest declamation)
+                   (loop for tvars = (mapcar #'make-tvar tvarnames)
+                         for name in names
+                         collect (make-instance 'declamation-type
+                                   :type type :parameters tvars :name name))))
+                ((variable)
+                 (loop for name in (rest declamation)
+                       collect (make-instance 'declamation-variable
+                                 :name name))))))
+
+(defmethod phase0parse ((tl declamation-type) pre-module)
+  (setf (waiting-on-vars tl) nil (waiting-on-types tl) nil)
+  (let* ((name (name tl)) (params (parameters tl)) (type (type tl))
+         (env (environment pre-module))
+         (info (handler-case (lookup name env)
+                 (variable-unbound (e)
+                   (push (name e) (waiting-on-vars tl))
+                   (return-from phase0parse nil))))
+         (type-env (type-env pre-module))
+         (new-type-env
+           (augment-type-env type-env
+                             (loop for param in params
+                                   collect (list (name param) () param))))
+         (type (handler-case (parse-type type new-type-env)
+                 (unknown-adt (e)
+                   (push (name e) (waiting-on-types tl))
+                   (return-from phase0parse nil)))))
+    (setf (declared-type info) (schema type params)
+          (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq)))
+  nil)
+
+(defmethod phase0parse ((tl declamation-variable) pre-module)
+  ;; independent
+  (let* ((name (name tl)) (env (environment pre-module))
+         (old-info (forgiving-lookup name env)))
+    (etypecase old-info
+      (variable-info)
+      (null (setf (lookup name env)
+                  (make-instance 'variable-info
+                    :variable (make-instance 'variable :name name)))))
+    (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq)))
+  nil)

@@ -17,7 +17,7 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
 
 (defclass decltype-mixin (info)
   (;; A SCHEMA or NIL, but I don't want to have to depend on type.lisp
-   (%declared-type :initarg :type :initform nil :reader declared-type)))
+   (%declared-type :initarg :type :initform nil :accessor declared-type)))
 
 (defclass variable-info (decltype-mixin info)
   ((%variable :initarg :variable :reader variable)))

@@ -66,6 +66,13 @@
    (%mll :initarg :mll :reader mll)
    (%expr :initarg :expr :reader expr)))
 
+(defclass declamation-type (waiting-on-vars waiting-on-types toplevel)
+  ((%name :initarg :name :reader name :type symbol)
+   (%type :initarg :type :reader type)))
+
+(defclass declamation-variable (toplevel)
+  ((%name :initarg :name :reader name :type symbol)))
+
 (defclass tlunknown (toplevel)
   ((%waiting-on-tlop :initarg :waiting-on-tlop
                      :reader waiting-on-tlop :type symbol)
