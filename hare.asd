@@ -9,6 +9,8 @@
    (:file "env" :depends-on ("conditions" "packages"))
    (:file "type-env" :depends-on ("conditions" "packages"))
    (:file "type" :depends-on ("type-env" "packages"))
+   (:file "polytype" :depends-on ("type" "packages"))
+   (:file "type-subst" :depends-on ("polytype" "type" "packages"))
    (:file "parse-type" :depends-on ("type" "type-env" "packages"))
    (:file "ast" :depends-on ("type" "env" "packages"))
    (:file "literal" :depends-on ("type-env" "env" "packages"))

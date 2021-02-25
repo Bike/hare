@@ -209,33 +209,6 @@ available; their values as integers are not defined.
                type)
   t)
 
-;;; A "subst" is an alist (tvar . type) used to describe substitutions.
-(defun empty-subst () nil)
-
-;;; Given a subst and a type, make a new type in which all the
-;;; tvars are replaced by the associated type. (Type doesn't have to be new
-;;; if there are no changes.)
-(defun subst-type (subst type)
-  (map-type (lambda (type)
-              (when (typep type 'tvar)
-                (let ((pair (assoc type subst :test #'eq)))
-                  (if pair (cdr pair) nil))))
-            type))
-
-(defun compose-subst (subst1 subst2)
-  ;; note: diehl uses Map.union, which i believe takes the left
-  ;; item if there's a duplicate. CL union leaves this undefined.
-  (union (mapcar (lambda (pair)
-                   (cons (car pair) (subst-type subst1 (cdr pair))))
-                 subst2)
-         subst1
-         :key #'car))
-(defun compose-substs (&rest substs)
-  (cond ((null substs) (empty-subst))
-        ((null (rest substs)) (first substs))
-        (t (compose-subst (first substs)
-                          (apply #'compose-substs (rest substs))))))
-
 ;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; ADT stuff
@@ -295,52 +268,3 @@ available; their values as integers are not defined.
                      :fields (loop for field in (fields constructor)
                                    collect (subst-type map field))))
      (make-adt adt-def new))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Type schemata
-;;; AKA polytypes. They are NOT types in the above way.
-;;; After all, a value can't be a polytype. A polytype must be instantiated.
-;;;
-
-(defclass schema ()
-  (;; A list of tvars.
-   (%tvars :initarg :tvars :accessor tvars :type list)
-   ;; The underlying type, in which the tvars are available for use.
-   (%type :initarg :type :accessor type :type type)))
-
-;;; Convenience
-(defun schema (type &optional tvars)
-  (make-instance 'schema :tvars tvars :type type))
-
-(defmethod print-object ((object schema) stream)
-  (print-unreadable-object (object stream :type t)
-    (format stream "∀~:a: ~a" (mapcar #'name (tvars object))
-            (unparse-type (type object)))))
-
-;;; Return a list of tvariables free in type or schema or whatever.
-(defun free (type)
-  (let ((tvars nil))
-    (mapnil-type (lambda (ty)
-                   (when (typep ty 'tvar)
-                     (pushnew ty tvars :test #'eq)))
-                 type)
-    tvars))
-(defun free-in-schema (schema)
-  (set-difference (free (type schema)) (tvars schema) :test #'eq))
-
-;;; Subst
-(defun subst-schema (subst schema)
-  ;; Remove any part of the subst that refers to a bound variable.
-  (let* ((tvars (tvars schema))
-         (sans (remove-if (lambda (ty) (member ty tvars :test #'eq))
-                          subst
-                          :key #'car)))
-    (schema (subst-type sans (type schema)) tvars)))
-
-;;; HM operation. Given a schema, return a type with fresh free variables
-;;; for all the schema's old bound variables.
-(defun instantiate (schema)
-  (let ((map (loop for tvar in (tvars schema)
-                   collect (cons tvar (make-tvar (name tvar))))))
-    (subst-type map (type schema))))
