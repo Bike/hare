@@ -137,7 +137,7 @@
          (env (make-env params infos env)))
     (make-instance 'lambda-initializer
       :params vars
-      :body (convert `(seq ,@forms) env type-env))))
+      :body (convert-seq forms env type-env))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;

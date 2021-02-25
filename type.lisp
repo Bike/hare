@@ -244,6 +244,7 @@ available; their values as integers are not defined.
 ;;; Definition of a particular constructor in an ADT. Not a type.
 (defclass constructor ()
   ((%name :initarg :name :reader name :type symbol)
+   (%adt-def :initarg :adt-def :reader adt-def :type adt-def)
    ;; A proper list of TYPEs
    (%fields :initarg :fields :accessor fields :type list)))
 

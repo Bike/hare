@@ -15,6 +15,9 @@
   (loop for form in list
         collect (convert form env type-env)))
 
+(defun convert-seq (list env type-env)
+  (make-instance 'seq :asts (convertlis list env type-env)))
+
 (defun convert-symbol (symbol env type-env)
   (let ((info (lookup symbol env)))
     (etypecase info
@@ -48,7 +51,7 @@
 (defgeneric convert-special (operator rest env type-env))
 
 (defmethod convert-special ((operator (eql 'seq)) rest env type-env)
-  (make-instance 'seq :asts (convertlis rest env type-env)))
+  (convert-seq rest env type-env))
 
 (defmethod convert-special ((operator (eql 'let)) rest env type-env)
   (destructuring-bind ((varname value) &rest body) rest
@@ -91,23 +94,33 @@
         :var (make-variable var) :len (convert len env type-env)
         :body (convert body (acons var lvar env) type-env)))))
 
+(defun convert-clause (constructor-name varnames bodyforms env type-env)
+  (let* ((constructor (find-constructor constructor-name type-env))
+         (variables (loop for varname in varnames
+                          collect (make-instance 'variable :name varname)))
+         (var-infos (loop for variable in variables
+                          collect (make-instance 'variable-info
+                                    :variable variable)))
+         (body-env (make-env varnames var-infos env))
+         (body (convert-seq bodyforms body-env type-env)))
+    (make-instance 'case-clause
+      :constructor constructor :variables variables :body body)))
+
 (defun convert-case (head args env type-env)
-  (destructuring-bind (value &rest cases) args
-    (when (null cases)
+  (destructuring-bind (value &rest clauses) args
+    (when (null clauses)
       (error "Empty case"))
-    (multiple-value-bind (def cases)
-        (case-adt-def cases type-env)
-      (let ((cases
-              (loop for ((constructor . vars) . body) in cases
-                       for lvars = (mapcar #'make-variable vars)
-                    for new-env = (make-env vars lvars env)
-                    collect (cons (cons constructor lvars)
-                                  (convertlis body new-env type-env)))))
-        (make-instance 'case
-          :value (convert value env type-env)
-          :cases cases
-          :case!p (eq head 'case!)
-          :adt-def def)))))
+    (let* ((clauses
+             (loop for ((cname . vars) . body) in clauses
+                   collect (convert-clause cname vars body env type-env)))
+           (adt-def (adt-def (constructor (first clauses)))))
+      (assert (loop for clause in (rest clauses)
+                    always (eq adt-def (adt-def (constructor clause)))))
+      (make-instance 'case
+        :value (convert value env type-env)
+        :clauses clauses
+        :case!p (eq head 'case!)
+        :adt-def adt-def))))
 
 (defmethod convert-special ((operator (eql 'case)) args env type-env)
   (convert-case operator args env type-env))

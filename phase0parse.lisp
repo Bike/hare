@@ -163,10 +163,11 @@
            (loop for cname in cnames
                  for fields in fieldses
                  collect (make-instance 'constructor
-                           :name cname :fields fields))))
+                           :name cname :adt-def pre-def :fields fields))))
     (setf (constructors pre-def) constructors
           (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
-    (finish-adt-def pre-def type-env)
+    (loop for constructor in constructors
+          do (add-adt-constructor constructor type-env))
     (append (phase0-type-dependencies pre-module name)
             (loop for cname in cnames
                   nconc (phase0-initop-dependencies pre-module cname)))))

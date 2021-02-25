@@ -28,9 +28,9 @@ and ADD-TYPE modify one.
 (defun find-adt-def (name type-env)
   (or (gethash name (by-name type-env)) (error 'unknown-adt :name name)))
 
-(defun find-adt-def-from-constructor (constructor type-env)
-  (or (gethash constructor (by-constructor type-env))
-      (error 'unknown-constructor :name constructor)))
+(defun find-constructor (constructor-name type-env)
+  (or (gethash constructor-name (by-constructor type-env))
+      (error 'unknown-constructor :name constructor-name)))
 
 (defun make-type-env () (make-instance 'type-env))
 
@@ -47,11 +47,8 @@ and ADD-TYPE modify one.
         (error "ADT multiply defined: ~a" name)
         (setf (gethash name by-name) adt-def))))
 
-;;; Finish adding a now-complete adt-def to the environment.
-(defun finish-adt-def (adt-def type-env)
-  (loop with by-constructor = (by-constructor type-env)
-        for constructor in (constructors adt-def)
-        do (if (nth-value 1 (gethash constructor by-constructor))
-               (error "Constructor multiply defined: ~a" constructor)
-               (setf (gethash constructor by-constructor) adt-def)))
-  (values))
+(defun add-adt-constructor (constructor type-env)
+  (let ((by-constructor (by-constructor type-env)))
+    (if (nth-value 1 (gethash constructor by-constructor))
+        (error "Constructor multiply defined: ~a" constructor)
+        (setf (gethash (name constructor) by-constructor) constructor))))

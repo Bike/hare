@@ -172,13 +172,19 @@ Forces the pointer to point to the particular constructor type, as expected.
     :initialization (map-ast function (initialization ast))
     :body (map-ast function (body ast))))
 
+(defclass case-clause ()
+  ((%constructor :initarg :constructor :accessor constructor
+                 :type constructor)
+   ;; A proper list of VARIABLEs.
+   (%variables :initarg :variables :accessor variables :type list)
+   (%body :initarg :body :accessor body :type ast)))
+
 (defclass case (ast)
   ((%value :initarg :value :accessor value :type ast)
-   ;; The adts this thing deconstructs.
+   ;; The ADT this thing deconstructs.
    (%adt-def :initarg :adt-def :accessor adt-def :type adt-def)
-   ;; A list of ((symbol variable*) . ast),
-   ;; symbol being the constructor name.
-   (%cases :initarg :cases :accessor cases :type list)
+   ;; A proper list of CASE-CLAUSEs.
+   (%clauses :initarg :clauses :accessor clauses :type list)
    ;; Is this case!, the pointer version?
    (%case!p :initarg :case!p :accessor case!p :type bool)))
 (defmethod mapnil-ast (function (ast case))
