@@ -19,5 +19,4 @@
    (:file "phase0parse" :depends-on ("phase0" "env" "type-env" "type"
                                               "literal" "packages"))
    (:file "infer" :depends-on ("type" "literal" "ast" "packages"))
-   #+(or)
    (:file "module" :depends-on ("parse-type" "literal" "env" "packages"))))
