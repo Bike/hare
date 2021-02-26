@@ -189,15 +189,18 @@ Forces the pointer to point to the particular constructor type, as expected.
    (%case!p :initarg :case!p :accessor case!p :type bool)))
 (defmethod mapnil-ast (function (ast case))
   (mapnil-ast function (value ast))
-  (loop for (_ . sub) in (cases ast)
-        do (mapnil-ast function sub)))
+  (loop for clause in (clauses ast)
+        do (mapnil-ast function clause)))
 (defmethod map-ast (function (ast case))
   (make-instance 'case
     :value (map-ast function (value ast))
     :adt-def (adt-def ast)
     :case!p (case!p ast)
-    :cases (loop for (x . sub) in (cases ast)
-                 collect (cons x (map-ast function sub)))))
+    :clauses (loop for clause in (clauses ast)
+                   collect (make-instance 'case-clause
+                             :constructor (constructor clause)
+                             :variables (variables clause)
+                             :body (map-ast function (body clause))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
