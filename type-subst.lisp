@@ -33,20 +33,18 @@
                       (type schema))
             tvars)))
 
-(defun compose-bindings (bindings1 bindings2)
-  ;; Apply substitutions from the first to the second, then take the union.
-  ;; note: diehl uses Map.union, which i believe takes the left
-  ;; item if there's a duplicate. CL union leaves this undefined.
-  (union (mapcar (lambda (pair)
-                   (cons (car pair)
-                         (subst-type bindings1 (cdr pair))))
-                 bindings2)
-         bindings1
-         :key #'car))
-
 (defun compose-tysubst (tysubst1 tysubst2)
   (make-instance 'tysubst
-    :bindings (compose-bindings (bindings tysubst1) (bindings tysubst2))))
+    :bindings
+    ;; Apply substitutions from the first to the second, then take the union.
+    ;; note: diehl uses Map.union, which i believe takes the left
+    ;; item if there's a duplicate. CL union leaves this undefined.
+    (union (mapcar (lambda (pair)
+                     (cons (car pair)
+                           (subst-type tysubst1 (cdr pair))))
+                   (bindings tysubst2))
+           (bindings tysubst1)
+           :key #'car)))
 
 (defun compose-tysubsts (&rest tysubsts)
   (cond ((null tysubsts) (empty-tysubst))
