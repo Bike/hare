@@ -45,3 +45,17 @@
                   (let ((pair (assoc type map :test #'eq)))
                     (if pair (cdr pair) nil))))
               (type schema))))
+
+;;; This is a bit like instantiating a polytype, so it's here.
+;;; Given a constructor, we return an ADT type and a list of fields
+;;; for that constructor. All of these have fresh type variables substituted
+;;; for all of the ADT definition's. This is useful in infer.lisp.
+(defun instantiate-constructor (constructor)
+  (let* ((adt-def (adt-def constructor))
+         (old (tvars adt-def))
+         (new (loop for tvar in old collect (make-tvar (name tvar))))
+         (map (mapcar #'cons old new))
+         (subst (make-tysubst map)))
+    (values
+     (make-adt adt-def new)
+     (loop for field in (fields constructor) collect (subst-type map field)))))

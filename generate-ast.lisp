@@ -136,18 +136,3 @@
 (defun convert-literal (form env type-env)
   (make-instance 'literal
     :initializer (parse-literal form env type-env)))
-
-;;; Given the ((constructor var*) . ast)* list from a case,
-;;; return the appropriate adt def, and order the cases to match the def.
-(defun case-adt-def (cases type-env)
-  (let* ((constructors (mapcar #'caar cases))
-         (def (find-adt-def-from-constructor (first constructors) type-env))
-         (oconstructors (constructors def)))
-    (unless (null (set-exclusive-or constructors oconstructors :test #'eq))
-      ;; FIXME: improve message
-      (error "Case mismatch ~a ~a" constructors oconstructors))
-    (values def
-            ;; Rearrange the cases.
-            (loop for oconstructor in oconstructors
-                  collect (find oconstructor cases
-                                :key #'caar :test #'eq)))))

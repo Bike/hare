@@ -77,9 +77,8 @@
     (write (name (variable i)) :stream stream)))
 
 (defclass constructor-initializer (initializer)
-  ((%def :accessor adt-def :initarg :def :type adt-def)
-   (%constructor :accessor constructor :initarg :constructor
-                 :type symbol)
+  ((%constructor :accessor constructor :initarg :constructor
+                 :type constructor)
    ;; A list of initializers.
    (%fields :accessor fields :initarg :fields :type list)))
 
@@ -104,10 +103,10 @@
      (error "Found initializer in literal context: ~a" literal))
     (symbol (lookup literal env))
     (cons ; constructor
-     (let* ((constructor (car literal)) (fields (cdr literal))
-            (def (find-adt-def-from-constructor constructor type-env)))
+     (let* ((cname (car literal)) (fields (cdr literal))
+            (constructor (find-constructor cname type-env)))
        (make-instance 'constructor-initializer
-         :def def :constructor constructor
+         :constructor constructor
          :fields (loop for field in fields
                        collect (parse-literal field env type-env)))))))
 
@@ -123,10 +122,10 @@
     ((cons (member array arrayn bytes))
      (error "Not implemented yet: ~a" (car initializer)))
     (cons ; constructor
-     (let* ((constructor (car initializer)) (fields (cdr initializer))
-            (def (find-adt-def-from-constructor constructor type-env)))
+     (let* ((cname (car initializer)) (fields (cdr initializer))
+            (constructor (find-constructor cname type-env)))
        (make-instance 'constructor-initializer
-         :def def :constructor constructor
+         :constructor constructor
          :fields (loop for field in fields
                        collect (parse-initializer field env type-env)))))))
 

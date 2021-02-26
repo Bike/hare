@@ -1,27 +1,29 @@
 (in-package #:hare)
 
 ;; A type substitution, i.e. a mapping from tvars to types.
-(defclass subst ()
+(defclass tysubst ()
   (;; An alist (tvar . type)
    (%bindings :initarg :bindings :accessor bindings)))
 
-(defun empty-subst () (make-instance 'subst :bindings ()))
+(defun empty-tysubst () (make-instance 'tysubst :bindings ()))
+
+(defun make-tysubst (map) (make-instance 'tysubst :bindings map))
 
 ;;; Given a subst and a type, make a new type in which all the
 ;;; tvars are replaced by the associated type. (Type doesn't have to be new
 ;;; if there are no changes.)
-(defun subst-type (subst type)
-  (let ((bindings (bindings subst)))
+(defun subst-type (tysubst type)
+  (let ((bindings (bindings tysubst)))
     (map-type (lambda (type)
                 (when (typep type 'tvar)
                   (let ((pair (assoc type bindings :test #'eq)))
                     (if pair (cdr pair) nil))))
               type)))
 
-(defun subst-schema (subst schema)
+(defun subst-schema (tysubst schema)
   ;; Remove any part of the subst that refers to a bound variable.
   ;; We do this without consing up a restricted subst.
-  (let ((tvars (tvars schema)) (bindings (bindings subst)))
+  (let ((tvars (tvars schema)) (bindings (bindings tysubst)))
     (schema (map-type (lambda (type)
                         (when (typep type 'tvar)
                           (let ((pair (assoc type bindings :test #'eq)))
@@ -42,13 +44,13 @@
          bindings1
          :key #'car))
 
-(defun compose-subst (subst1 subst2)
-  (make-instance 'subst
-    :bindings (compose-bindings (bindings subst1) (bindings subst2))))
+(defun compose-tysubst (tysubst1 tysubst2)
+  (make-instance 'tysubst
+    :bindings (compose-bindings (bindings tysubst1) (bindings tysubst2))))
 
-(defun compose-substs (&rest substs)
-  (cond ((null substs) (empty-subst))
-        ((null (rest substs)) (first substs))
-        (t (make-instance 'subst
-             :bindings (reduce #'compose-bindings substs
+(defun compose-tysubsts (&rest tysubsts)
+  (cond ((null tysubsts) (empty-tysubst))
+        ((null (rest tysubsts)) (first tysubsts))
+        (t (make-instance 'tysubst
+             :bindings (reduce #'compose-bindings tysubsts
                                :key #'bindings)))))

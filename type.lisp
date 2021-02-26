@@ -251,20 +251,3 @@ available; their values as integers are not defined.
   (loop for ty in (adt-args type) do (map-type function ty)))
 (defmethod unparse-type ((type adt))
   `(,(name (adt-def type)) ,@(mapcar #'unparse-type (adt-args type))))
-
-;;; This is like instantiating a schema, below.
-;;; It makes a fresh type variable for each variable bound in the def,
-;;; substitutes them into the members, and then returns those.
-;;; As a second value it returns the instantiated adt.
-;;; That is, it returns a list of lists of types.
-(defun instantiate-adt-def (adt-def)
-  (let* ((old (tvars adt-def))
-         (new (loop for tvar in old collect (make-tvar (name tvar))))
-         (map (mapcar #'cons old new)))
-    (values
-     (loop for constructor in (constructors adt-def)
-           collect (make-instance 'constructor
-                     :name (name constructor)
-                     :fields (loop for field in (fields constructor)
-                                   collect (subst-type map field))))
-     (make-adt adt-def new))))
