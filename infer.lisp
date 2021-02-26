@@ -272,7 +272,7 @@
          (ty (instantiate (lookup-type variable tenv))))
     (setf (type ast) ty)
     (make-inference (empty-tysubst)
-                    (make-varmap (list (cons variable ty)))
+                    (make-varmap (list (list variable ty)))
                     (empty-constmap))))
 
 (defmethod infer ((ast literal) tenv)
