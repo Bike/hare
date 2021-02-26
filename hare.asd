@@ -19,4 +19,6 @@
    (:file "phase0parse" :depends-on ("phase0" "env" "type-env" "type"
                                               "literal" "packages"))
    (:file "infer" :depends-on ("type" "literal" "ast" "packages"))
-   (:file "module" :depends-on ("parse-type" "literal" "env" "packages"))))
+   (:file "module" :depends-on ("parse-type" "infer" "literal" "env"
+                                             "packages"))
+   (:file "manifest" :depends-on ("module" "infer" "packages"))))
