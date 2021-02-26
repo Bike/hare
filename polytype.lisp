@@ -55,7 +55,21 @@
          (old (tvars adt-def))
          (new (loop for tvar in old collect (make-tvar (name tvar))))
          (map (mapcar #'cons old new))
-         (subst (make-tysubst map)))
+         (tysubst (make-tysubst map)))
     (values
      (make-adt adt-def new)
-     (loop for field in (fields constructor) collect (subst-type map field)))))
+     (loop for field in (fields constructor)
+           collect (subst-type tysubst field)))))
+
+;;; Same but do all constructors, and return as a (constructor . types) alist.
+(defun instantiate-adt-def (adt-def)
+  (let* ((old (tvars adt-def))
+         (new (loop for tvar in old collect (make-tvar (name tvar))))
+         (map (mapcar #'cons old new))
+         (tysubst (make-tysubst map)))
+    (values
+     (make-adt adt-def new)
+     (loop for constructor in (constructors adt-def)
+           for fieldtys = (loop for field in (fields constructor)
+                                collect (subst-type tysubst field))
+           collect (cons constructor fieldtys)))))

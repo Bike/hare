@@ -3,37 +3,36 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Type inference
-;;; A type environment is an alist (variable . schema)
-;;; A substitution is an alist (tvar . type)
 ;;;
 
-(defun subst-tenv (subst tenv)
-  (mapcar (lambda (pair)
-            (cons (car pair)
-                  (subst-schema subst (cdr pair))))
-          tenv))
+(defclass tenv ()
+  (;; An alist (variable . schema)
+   (%bindings :initarg :bindings :accessor bindings)))
+
+(defun make-tenv (map) (make-instance 'tenv :bindings map))
+
+(defun subst-tenv (tysubst tenv)
+  (make-tenv (mapcar (lambda (pair)
+                       (cons (car pair)
+                             (subst-schema tysubst (cdr pair))))
+                     (bindings tenv))))
 
 (defun lookup-type (key tenv)
-  (or (cdr (assoc key tenv :test #'type=))
+  (or (cdr (assoc key (bindings tenv) :test #'type=))
       (error "Unbound: ~s" key)))
 
 (defun restrict-tenv (key tenv)
-  (remove key tenv :key #'car :test #'type=))
+  (make-tenv (remove key (bindings tenv) :key #'car :test #'type=)))
 
 (defun extend-tenv (key schema tenv)
-  (acons key schema (restrict-tenv key tenv)))
-
-(defun restrict-tenv-list (keys tenv)
-  (remove-if (lambda (key) (find key keys :test #'type=))
-             tenv
-             :key #'car))
+  (make-tenv (acons key schema (bindings tenv))))
 
 (defun extend-tenv-list (keys schemata tenv)
-  (nconc (mapcar #'cons keys schemata)
-         (restrict-tenv-list keys tenv)))
+  (make-tenv (nconc (mapcar #'cons keys schemata) (bindings tenv))))
 
 (defun free-in-tenv (tenv)
-  (reduce #'union tenv :key (lambda (pair) (free-in-schema (cdr pair)))))
+  (reduce #'union (bindings tenv)
+          :key (lambda (pair) (free-in-schema (cdr pair)))))
 
 ;;; HM operation: Return a schema that binds all free variables in type
 ;;; that are not bound in the environment.
@@ -54,11 +53,11 @@
 ;;; Given two lists of types, unify corresponding elements.
 ;;; The lists are assumed to be the same length.
 (defun unify-pairwise (typelist1 typelist2)
-  (loop with subst = (empty-subst)
+  (loop with tysubst = (empty-tysubst)
         for t1 in typelist1
         for t2 in typelist2
-        do (setf subst (compose-subst (unify/2 t1 t2) subst))
-        finally (return subst)))
+        do (setf tysubst (compose-tysubst (unify/2 t1 t2) tysubst))
+        finally (return tysubst)))
 
 ;; Does t1 occur in t2?
 (defun occurs (t1 t2)
@@ -71,7 +70,7 @@
   (cond ((type= t1 t2) nil)
         ((occurs t1 t2)
          (error "Failed occurs check: ~s ~s" t1 t2))
-        (t (list (cons t1 t2)))))
+        (t (make-tysubst (list (cons t1 t2))))))
 (defmethod unify/2 ((t1 type) (t2 tvar)) (unify/2 t2 t1))
 
 (defmethod unify/2 ((t1 int) (t2 int))
@@ -103,11 +102,87 @@
   (if (null types)
       (error "Cannot unify nothing")
       ;; I think this is fine?
-      (loop with subst = (empty-subst)
+      (loop with tysubst = (empty-tysubst)
             with type1 = (first types)
             for type2 in (rest types)
-            do (setf subst (compose-subst (unify/2 type1 type2) subst))
-            finally (return subst))))
+            do (setf tysubst (compose-tysubst (unify/2 type1 type2) tysubst))
+            finally (return tysubst))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Onto inference.
+;;; The inference functions have the side effect of changing the TYPE slot of
+;;; initializers/ASTs. They return one of these things, a combination of
+;;; a subst with some mappings from names to types; this should be useful to
+;;; modules and stuff.
+
+(defclass inference ()
+  ((%tysubst :initarg :tysubst :reader tysubst :type tysubst)
+   ;; An alist of (variable . type*)
+   (%variable-map :initarg :varmap :reader varmap :type list)
+   ;; An alist of (literal . type*)
+   (%constant-map :initarg :constmap :reader constmap :type list)))
+
+(defun empty-varmap () nil)
+(defun empty-constmap () nil)
+
+(defun make-varmap (alist) alist)
+(defun make-constmap (alist) alist)
+
+(defun make-inference (tysubst varmap constmap)
+  (make-instance 'inference
+    :tysubst tysubst :varmap varmap :constmap constmap))
+
+(defun empty-inference ()
+  (make-instance 'inference
+    :tysubst (empty-tysubst) :varmap nil :constmap nil))
+
+(defun merge-map/2 (map1 map2)
+  (let ((result (copy-alist map1)))
+    (loop for (key . rest) in map2
+          for pair = (assoc key result :test #'eq)
+          if pair
+            do (setf (cdr pair) (append rest (cdr pair)))
+          else do (push (cons key rest) result))
+    result))
+
+(defun subst-map (tysubst map)
+  (loop for (key . rest) in map
+        collect (cons key
+                      ;; We can get duplication by applying a tysubst, for
+                      ;; example if two tvars are later unified.
+                      (remove-duplicates
+                       (loop for ty in rest
+                             collect (subst-type tysubst ty))
+                       :test #'type=))))
+
+(defun subst-inference (tysubst inference)
+  (make-instance 'inference
+    :tysubst (compose-tysubst tysubst (tysubst inference))
+    :varmap (subst-map tysubst (varmap inference))
+    :constmap (subst-map tysubst (constmap inference))))
+
+(defun compose-inferences/2 (inference1 inference2)
+  (let ((tysubst (compose-tysubst (tysubst inference1) (tysubst inference2))))
+    (make-instance 'inference
+      :tysubst tysubst
+      :varmap (subst-map tysubst (merge-map/2 (varmap inference1)
+                                              (varmap inference2)))
+      :constmap (subst-map tysubst (merge-map/2 (constmap inference1)
+                                                (constmap inference2))))))
+
+(defun compose-inferences (list)
+  (cond ((null list) (empty-inference))
+        ((null (rest list)) (first list))
+        (t (reduce #'compose-inferences/2 list))))
+
+;;; Apply an inference's subst to its maps.
+(defun finalize-inference (inference)
+  (let ((tysubst (tysubst inference)))
+    (make-instance 'inference
+      :tysubst tysubst
+      :varmap (subst-map tysubst (varmap inference))
+      :constmap (subst-map tysubst (constmap inference)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -118,139 +193,128 @@
 (defgeneric infer-initializer (initializer tenv))
 
 (defun infer-initializer-toplevel (initializer tenv)
-  (let ((subst (nth-value 1 (infer-initializer initializer tenv))))
-    (mapnil-initializer (lambda (initializer)
-                          (setf (type initializer)
-                                (subst-type subst (type initializer))))
-                        initializer)
-    (values (type initializer) subst)))
-
-(defmethod infer-initializer :around (initializer tenv)
-  (multiple-value-bind (type subst)
-      (call-next-method)
-    (setf (type initializer) type)
-    (values type subst)))
+  (let* ((inference (infer-initializer initializer tenv))
+         (tysubst (tysubst inference)))
+    (flet ((subst-ast (ast)
+             (setf (type ast) (subst-type tysubst (type ast)))))
+      (mapnil-initializer (lambda (initializer)
+                            (setf (type initializer)
+                                  (subst-type tysubst (type initializer)))
+                            (when (typep initializer 'lambda-initializer)
+                              (mapnil-ast #'subst-ast (body initializer))))
+                          initializer))
+    (finalize-inference inference)))
 
 (defmethod infer-initializer ((initializer integer-initializer) tenv)
   (declare (ignore tenv))
   ;; Must be an integer type, but we can't express that in the type system.
-  (values (make-tvar '#:integer) (empty-subst)))
+  (setf (type initializer) (make-tvar '#:integer))
+  (empty-inference))
 
 (defmethod infer-initializer ((initializer variable-initializer) tenv)
   (let* ((variable (variable initializer))
          (type (instantiate (lookup-type variable tenv))))
-    (values type (empty-subst))))
+    (setf (type initializer) type)
+    (make-instance 'inference
+      :tysubst (empty-tysubst) :constmap (empty-constmap)
+      :varmap (make-varmap (list (list variable type))))))
 
 (defmethod infer-initializer ((initializer constructor-initializer) tenv)
-  (let ((def (adt-def initializer)) (constructor (constructor initializer))
-        (fields (fields initializer)))
-    (multiple-value-bind (members type) (instantiate-adt-def def)
-      (let* ((member (cdr (or (assoc constructor members)
-                              (error "BUG: ADT mismatch")))))
-        (loop with types = nil
-              with subst = (empty-subst)
-              for field in fields
-              do (multiple-value-bind (ty subs)
-                     (infer-initializer field tenv)
-                   (push ty types)
-                   (setf subst
-                         (compose-subst subs subst)))
-              finally (let* ((more-subst
-                               (unify-pairwise member (reverse types)))
-                             (subst (compose-subst more-subst subst)))
-                        (return (values (subst-type subst type)
-                                        subst))))))))
+  (let* ((constructor (constructor initializer))
+         (fields (fields initializer)))
+    (multiple-value-bind (tapp fieldtys) (instantiate-constructor constructor)
+      (setf (type initializer) tapp)
+      (let ((finference
+              (compose-inferences
+               (loop for field in fields
+                     collect (infer-initializer field tenv))))
+            (usubst (unify-pairwise (mapcar #'type fields) fieldtys)))
+        (subst-inference usubst finference)))))
 
 (defmethod infer-initializer ((initializer undef-initializer) tenv)
   (declare (ignore tenv))
   ;; undef can be anything.
-  (values (make-tvar '#:any) (empty-subst)))
+  (setf (type initializer) (make-tvar '#:any))
+  (empty-inference))
 
 (defmethod infer-initializer ((initializer lambda-initializer) tenv)
-  (let* ((params (params initializer))
+  (let* ((params (params initializer)) (body (body initializer))
          (paramtvars (loop for param in params
                            collect (make-tvar (name param))))
          ;; Not polymorphic, as per typed lambda calculus computability
+         ;; (Also because what would passing a polymorphic object mean.)
          (paramsc (mapcar #'schema paramtvars))
          ;; FIXME: We need to extend the GLOBAL tenv, here,
          ;; but as-is, if we initialized a local variable with a lambda
          ;; for some reason, inference would see local variable bindings
          ;; even though it shouldn't.
-         (new-tenv (nconc (mapcar #'cons params paramsc) tenv)))
-    (multiple-value-bind (type subst)
-        (infer-ast-toplevel (body initializer) new-tenv)
-      (values (make-fun type
-                        (loop for ty in paramtvars
-                              collect (subst-type subst ty)))
-              subst))))
+         ;; This could only happen if lambda initializers were allowed
+         ;; within functions.
+         (new-tenv (extend-tenv-list params paramsc tenv))
+         (inference (infer body new-tenv))
+         (bodytype (type body))
+         (tysubst (tysubst inference)))
+    (setf (type initializer)
+          (make-fun bodytype (loop for ty in paramtvars
+                                   collect (subst-type tysubst ty))))
+    inference))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Main event
 ;;; Infer the type of the given initializer or AST.
-;;; Returns two values: The type and a substitution.
-;;; Modifies the object to have the type in the type slot.
-;;; Use infer-toplevel generally - it will iterate through, running the
-;;; final substitution on all the slotted types.
 ;;;
 
 (defgeneric infer (ast tenv))
 
-;;; entry point: do inference, then recurse back through
-;;; and apply the substitution to all types.
-;;; Return the result of inference (but the type has the subst applied).
-(defun infer-ast-toplevel (ast tenv)
-  (let ((subst (nth-value 1 (infer ast tenv))))
-    (mapnil-ast (lambda (ast)
-                  (setf (type ast)
-                        (subst-type subst (type ast))))
-                ast)
-    (values (type ast) subst)))
-
-;;; Put the inferred type into the AST.
-(defmethod infer :around (ast tenv)
-  (multiple-value-bind (type subst)
-      (call-next-method)
-    (setf (type ast) type)
-    (values type subst)))
-
 (defmethod infer ((ast reference) tenv)
-  (values (instantiate (lookup-type (variable ast) tenv)) (empty-subst)))
+  (let* ((variable (variable ast))
+         (ty (instantiate (lookup-type variable tenv))))
+    (setf (type ast) ty)
+    (make-inference (empty-tysubst)
+                    (make-varmap (list (cons variable ty)))
+                    (empty-constmap))))
 
 (defmethod infer ((ast literal) tenv)
-  (infer-initializer (initializer ast) tenv))
+  (let* ((initializer (initializer ast))
+         (inference (infer-initializer initializer tenv))
+         (ty (type initializer)))
+    (setf (type ast) ty)
+    inference))
 
 (defmethod infer ((ast seq) tenv)
   ;; FIXME: Unify the discarded values with Unit. (and define Unit.)
   (let ((ignored (butlast (asts ast)))
         (final (first (last (asts ast)))))
     (unless (null ignored) (error "whoops not implemented"))
-    (infer final tenv)))
+    (prog1 (infer final tenv)
+      (setf (type ast) (type final)))))
 
 (defmethod infer ((ast branch) tenv)
-  (multiple-value-bind (testt testsubst)
-      (infer (test ast) tenv)
-    (multiple-value-bind (thent thensubst)
-        (infer (then ast) tenv)
-      (multiple-value-bind (elset elsesubst)
-          (infer (else ast) tenv)
-        (let ((testsubst2 (unify testt (make-bool)))
-              (resultsubst (unify thent elset)))
-          (values (subst-type resultsubst thent)
-                  (compose-substs
-                   resultsubst testsubst2
-                   elsesubst thensubst testsubst)))))))
+  (let ((itest (infer (test ast) tenv))
+        (ithen (infer (then ast) tenv))
+        (ielse (infer (else ast) tenv))
+        (tt (unify (type (test ast)) (make-bool)))
+        (tu (unify (type (then ast)) (type (else ast)))))
+    (setf (type ast) (type (then ast)))
+    (subst-inference tt
+                     (subst-inference tu
+                                      (compose-inferences
+                                       (list itest ithen ielse))))))
 
 (defmethod infer ((ast bind) tenv)
-  (multiple-value-bind (valt valsubst) (infer (value ast) tenv)
-    (let* ((new-env (subst-tenv valsubst tenv))
-           #+polymorphic-local
-           (valsc (generalize new-env valt))
-           #-polymorphic-local
-           (valsc (schema valt)))
-      (multiple-value-bind (bodyt bodysubst)
-          (infer (body ast) (extend-tenv (variable ast) valsc new-env))
-        (values bodyt (compose-subst valsubst bodysubst))))))
+  (let* ((value (value ast))
+         (ivalue (infer (value ast) tenv))
+         (valt (type value))
+         (new-tenv (subst-tenv (tysubst ivalue) tenv))
+         #+polymorphic-local
+         (valsc (generalize new-tenv valt))
+         #-polymorphic-local
+         (valsc (schema valt))
+         (new-tenv (extend-tenv (variable ast) valsc new-tenv))
+         (ibody (infer (body ast) new-tenv)))
+    (setf (type ast) (type ibody))
+    (compose-inferences/2 ivalue ibody)))
 
 #|
 (defmethod infer ((ast initialization) tenv)
@@ -274,62 +338,38 @@
 |#
 
 (defmethod infer ((ast case) tenv)
-  ;; I'm pretty unsure about a lot of this.
-  ;; Particularly, which inferences need to keep up previous envs,
-  ;; when to do substitutions, etc...
   (when (case!p ast) (error "not implemented yet"))
-  (let* ((def (adt-def ast))
-         (constructors (constructors def)))
-    (multiple-value-bind (members adt)
-        ;; Make a fresh type as if we were instantiating a schema
-        (instantiate-adt-def def)
-      (multiple-value-bind (valt valsubst1) (infer (value ast) tenv)
-        (let* (;; Unify the value with the adt.
-               (valsubst2 (unify valt adt))
-               (valsubst (compose-subst valsubst2 valsubst1))
-               ;; Substitute
-               (tenv (subst-tenv valsubst tenv)))
-          ;; Now infer each clause separately.
-          (loop with case-types = nil
-                with ret-subst = valsubst ; subst we'll return
-                for member in members
-                ;; case bindings are not polymorphic.
-                ;; not 100% sure that's correct though.
-                for schemata = (mapcar #'schema member)
-                for constructor in constructors
-                for ((case-cons . variables) . ast) in (cases ast)
-                for new-tenv = (extend-tenv-list variables schemata tenv)
-                do ;; Make sure everything's in the right order.
-                   ;; (It should be made so in parse-form.)
-                   (assert (eq case-cons constructor))
-                   ;; Infer
-                   (multiple-value-bind (type subst)
-                       (infer ast new-tenv)
-                     (push type case-types)
-                     (setf ret-subst (compose-subst subst ret-subst)))
-                finally
-                   (return
-                     ;; Unify all the case types, and return the accumulated
-                     ;; subst.
-                     (values (apply #'unify case-types) ret-subst))))))))
+  (multiple-value-bind (tapp cmap) (instantiate-adt-def (adt-def ast))
+    (let* ((clauses (clauses ast))
+           (value (value ast))
+           (ivalue (infer value tenv))
+           (vsubst (unify (type value) tapp))
+           (iclauses
+             (loop for clause in clauses
+                   for constructor = (constructor clause)
+                   for variables = (variables clause)
+                   for fieldtys = (cdr (assoc constructor cmap :test #'eq))
+                   ;; Note that case bindings are monomorphic.
+                   for fieldscs = (mapcar #'schema fieldtys)
+                   for new-tenv = (extend-tenv-list variables fieldscs tenv)
+                   collect (infer (body clause) new-tenv)))
+           (csubst (apply #'unify (mapcar #'type clauses))))
+      (setf (type ast) (type (body (first clauses))))
+      (subst-inference
+       vsubst
+       (subst-inference
+        csubst
+        (compose-inferences (list* ivalue iclauses)))))))
 
 (defmethod infer ((ast call) tenv)
-  (multiple-value-bind (funt funsubst) (infer (callee ast) tenv)
-    (let ((tenv (subst-tenv funsubst tenv)))
-      (multiple-value-bind (argtypes argsubst)
-          (loop with types = nil
-                with subst = funsubst
-                for arg in (args ast)
-                do (multiple-value-bind (argty argsubst)
-                       (infer arg tenv)
-                     (push argty types)
-                     (setf subst
-                           (compose-subst argsubst subst)))
-                finally (return (values (nreverse types) subst)))
-        (let* (;; new variable for the return type
-               (rett (make-tvar))
-               ;; u-ni-fy
-               (callsubst (unify funt (make-pointer
-                                       (make-fun rett argtypes)))))
-          (values (subst-type callsubst rett)
-                  (compose-subst callsubst argsubst)))))))
+  (let* ((args (args ast))
+         (iargs (loop for arg in args collect (infer arg tenv)))
+         (callee (callee ast))
+         (icallee (infer callee tenv))
+         (rett (make-tvar '#:ret))
+         (csubst (unify (type callee)
+                        (make-pointer
+                         (make-fun rett (mapcar #'type args))))))
+    (setf (type ast) rett)
+    (subst-inference csubst
+                     (compose-inferences (list* icallee iargs)))))
