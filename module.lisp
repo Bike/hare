@@ -15,6 +15,7 @@
    (%inference :initarg :inference :reader inference :type inference)))
 
 (defun module (pre-module)
+  (assert (null (toplevels pre-module)))
   (let* ((varbinds (varbinds pre-module))
          (tmap
            (loop for (variable) in varbinds
