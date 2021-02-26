@@ -80,7 +80,9 @@ available; their values as integers are not defined.
 
 (defmacro with-type-cache ((&rest options) &body body)
   (declare (ignore options)) ; for future expansion
-  `(let ((*type-cache* (make-instance 'type-cache)))
+  `(let ((*type-cache* (if (boundp '*type-cache*)
+                           *type-cache*
+                           (make-instance 'type-cache))))
      ,@body))
 
 (defmacro cached-int (n)
