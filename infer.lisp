@@ -156,6 +156,11 @@
                              collect (subst-type tysubst ty))
                        :test #'type=))))
 
+;;; Return a new map with all of the variables removed.
+(defun varmap-sans (varmap variables)
+  (remove-if (lambda (var) (member var variables :test #'eq)) varmap
+             :key #'car))
+
 (defun subst-inference (tysubst inference)
   (make-instance 'inference
     :tysubst (compose-tysubst tysubst (tysubst inference))
@@ -175,6 +180,14 @@
   (cond ((null list) (empty-inference))
         ((null (rest list)) (first list))
         (t (reduce #'compose-inferences/2 list))))
+
+;;; Given an inference and some variables, return a new inference with those
+;;; variables removed from the varmap.
+(defun inference-sans (inference variables)
+  (make-instance 'inference
+    :tysubst (tysubst inference)
+    :varmap (varmap-sans (varmap inference) variables)
+    :constmap (constmap inference)))
 
 ;;; Apply an inference's subst to its maps.
 (defun finalize-inference (inference)
@@ -257,7 +270,7 @@
     (setf (type initializer)
           (make-fun bodytype (loop for ty in paramtvars
                                    collect (subst-type tysubst ty))))
-    inference))
+    (inference-sans inference params)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -311,10 +324,11 @@
          (valsc (generalize new-tenv valt))
          #-polymorphic-local
          (valsc (schema valt))
-         (new-tenv (extend-tenv (variable ast) valsc new-tenv))
+         (variable (variable ast))
+         (new-tenv (extend-tenv variable valsc new-tenv))
          (ibody (infer (body ast) new-tenv)))
     (setf (type ast) (type ibody))
-    (compose-inferences/2 ivalue ibody)))
+    (inference-sans (compose-inferences/2 ivalue ibody) (list variable))))
 
 #|
 (defmethod infer ((ast initialization) tenv)
@@ -352,7 +366,8 @@
                    ;; Note that case bindings are monomorphic.
                    for fieldscs = (mapcar #'schema fieldtys)
                    for new-tenv = (extend-tenv-list variables fieldscs tenv)
-                   collect (infer (body clause) new-tenv)))
+                   for prei = (infer (body clause) new-tenv)
+                   collect (inference-sans prei variables)))
            (csubst (apply #'unify (mapcar #'type clauses))))
       (setf (type ast) (type (body (first clauses))))
       (subst-inference
