@@ -91,6 +91,10 @@
    (%params :accessor params :initarg :params :type list)
    (%body :accessor body :initarg :body :type ast)))
 
+(defclass array-initializer (initializer)
+  (;; A list of initializers.
+   (%elements :accessor elements :initarg :elements :type list)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Parsing
@@ -119,7 +123,9 @@
     ((cons (eql lambda))
      (parse-lambda (cadr initializer) (cddr initializer)
                    env type-env))
-    ((cons (member array arrayn bytes))
+    ((cons (eql array))
+     (parse-array (rest initializer) env type-env))
+    ((cons (member arrayn bytes))
      (error "Not implemented yet: ~a" (car initializer)))
     (cons ; constructor
      (let* ((cname (car initializer)) (fields (cdr initializer))
@@ -137,6 +143,11 @@
     (make-instance 'lambda-initializer
       :params vars
       :body (convert-seq forms env type-env))))
+
+(defun parse-array (elementfs env type-env)
+  (make-instance 'array-initializer
+    :elements (loop for elementf in elementfs
+                    collect (parse-initializer elementf env type-env))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
