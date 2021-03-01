@@ -50,5 +50,4 @@
   (cond ((null tysubsts) (empty-tysubst))
         ((null (rest tysubsts)) (first tysubsts))
         (t (make-instance 'tysubst
-             :bindings (reduce #'compose-bindings tysubsts
-                               :key #'bindings)))))
+             :bindings (reduce #'compose-tysubst tysubsts)))))
