@@ -18,11 +18,14 @@
   (assert (null (toplevels pre-module)))
   (with-type-cache ()
     (let* ((varbinds (varbinds pre-module))
+           (env (environment pre-module))
            (tmap
-             (loop for (variable) in varbinds
-                   ;; FIXME: We're straight up ignoring type declamations here.
-                   for tv = (make-tvar (name variable))
-                   for sc = (schema tv (list tv))
+             ;; FIXME: Breaking environment abstraction
+             (loop for (name . info) in (bindings env)
+                   for variable = (variable info)
+                   for sc = (or (declared-type info)
+                                (let ((tv (make-tvar name)))
+                                  (schema tv (list tv))))
                    collect (cons variable sc)))
            (tenv (make-tenv tmap))
            (entries
