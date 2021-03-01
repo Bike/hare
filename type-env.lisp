@@ -11,12 +11,13 @@ and ADD-TYPE modify one.
 
 (defclass type-env ()
   (;; Type aliases. List of (name (tvar*) type)
-   (%aliases :initform (make-hash-table :test #'eq) :accessor aliases
-             :type list)
+   (%aliases :initform (make-hash-table :test #'eq) :initarg :aliases
+             :accessor aliases :type list)
    ;; ADTs
-   (%by-name :initform (make-hash-table :test #'eq) :accessor by-name
-             :type hash-table)
+   (%by-name :initform (make-hash-table :test #'eq) :initarg :by-name
+             :accessor by-name :type hash-table)
    (%by-constructor :initform (make-hash-table :test #'eq)
+                    :initarg :by-constructor
                     :accessor by-constructor :type hash-table)))
 
 (defun find-alias (name type-env)
