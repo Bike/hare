@@ -295,7 +295,7 @@
            (augment-type-env type-env
                              (loop for param in params
                                    collect (list (name param) () param))))
-         (type (handler-case (parse-type type new-type-env)
+         (type (handler-case (make-pointer (parse-type type new-type-env))
                  (unknown-adt (e)
                    (push (name e) (waiting-on-types tl))
                    (return-from phase0parse nil)))))
