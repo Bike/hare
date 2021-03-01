@@ -33,7 +33,7 @@
         (etypecase info
           (variable-info ; ordinary function call
            (make-instance 'call
-             :callee (variable info)
+             :callee (make-instance 'reference :variable (variable info))
              :args (convertlis args env type-env)))
           (symbol-macro-info
            (convert-cons (funcall (expander info) head env)
