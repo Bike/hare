@@ -68,6 +68,8 @@
 
 (defclass declamation-type (waiting-on-vars waiting-on-types toplevel)
   ((%name :initarg :name :reader name :type symbol)
+   ;; A proper list of TVARs.
+   (%parameters :initarg :parameters :reader parameters :type list)
    (%type :initarg :type :reader type)))
 
 (defclass declamation-variable (toplevel)
