@@ -127,7 +127,7 @@
     (etypecase old-info
       (variable-info)
       (null (setf (lookup name env) (make-instance 'variable-info
-                                      :variable (make-variable name)))))
+                                      :variable variable))))
     (push (cons variable initializer) (varbinds pre-module))
     (phase0-var-dependencies pre-module name)))
 
