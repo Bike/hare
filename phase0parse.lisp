@@ -312,5 +312,5 @@
       (null (setf (lookup name env)
                   (make-instance 'variable-info
                     :variable (make-instance 'variable :name name)))))
-    (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq)))
-  nil)
+    (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
+    (phase0-var-dependencies pre-module name)))
