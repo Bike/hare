@@ -97,7 +97,7 @@
 (defun convert-clause (constructor-name varnames bodyforms env type-env)
   (let* ((constructor (find-constructor constructor-name type-env))
          (variables (loop for varname in varnames
-                          collect (make-instance 'variable :name varname)))
+                          collect (make-variable varname)))
          (var-infos (loop for variable in variables
                           collect (make-instance 'variable-info
                                     :variable variable)))
