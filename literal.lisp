@@ -174,3 +174,7 @@
 
 (defmethod mapnil-initializer (function (i lambda-initializer))
   (declare (ignore function)))
+
+(defmethod mapnil-initializer (function (i array-initializer))
+  (loop for elem in (elements i)
+        do (mapnil-initializer function elem)))

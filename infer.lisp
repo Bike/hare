@@ -244,6 +244,19 @@
             (usubst (unify-pairwise (mapcar #'type fields) fieldtys)))
         (subst-inference usubst finference)))))
 
+(defmethod infer-initializer ((initializer array-initializer) tenv)
+  (let ((elements (elements initializer)))
+    (if elements
+        (let* ((eleminferences (loop for element in elements
+                                     collect (infer-initializer element tenv)))
+               (elemtys (mapcar #'type elements))
+               (u (apply #'unify elemtys)))
+          (setf (type initializer) (make-arrayt (first elemtys)))
+          (subst-inference u (compose-inferences eleminferences)))
+        (let ((ty (make-tvar '#:array)))
+          (setf (type initializer) (make-arrayt ty))
+          (empty-inference)))))
+
 (defmethod infer-initializer ((initializer undef-initializer) tenv)
   (declare (ignore tenv))
   ;; undef can be anything.
