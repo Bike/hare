@@ -6,7 +6,6 @@ A form is either
  * A symbol, referring to either a local variable or a global thing
  * A cons
    * (let (symbol form) form*) binds a local variable
-   * (if condition then else): Obvious. Condition must be a bool.
    * (seq form*): progn
    * (case form ((constructor var*) form*)*) deconstructs an ADT value.
      Like Haskell. If form isn't typed to a sized ADT, type error.
@@ -117,21 +116,6 @@ Forces the pointer to point to the particular constructor type, as expected.
 (defmethod mapnil-ast (function (ast reference)) (declare (ignore function)))
 (defmethod map-ast (function (ast reference))
   (make-instance 'reference :variable (variable ast)))
-
-;; if
-(defclass branch (ast)
-  ((%test :initarg :test :accessor test :type ast)
-   (%then :initarg :then :accessor then :type ast)
-   (%else :initarg :else :accessor else :type ast)))
-(defmethod mapnil-ast (function (ast branch))
-  (mapnil-ast function (test ast))
-  (mapnil-ast function (then ast))
-  (mapnil-ast function (else ast)))
-(defmethod map-ast (function (ast branch))
-  (make-instance 'branch
-    :test (map-ast function (test ast))
-    :then (map-ast function (then ast))
-    :else (map-ast function (else ast))))
 
 ;; LET with one variable
 (defclass bind (ast)

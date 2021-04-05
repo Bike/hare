@@ -64,13 +64,6 @@
   (make-instance 'reference
     :variable (variable ast) :type (subst-type tysubst (type ast))))
 
-(defmethod manifest-ast ((ast branch) tysubst)
-  (make-instance 'branch
-    :test (manifest-ast (test ast) tysubst)
-    :then (manifest-ast (then ast) tysubst)
-    :else (manifest-ast (else ast) tysubst)
-    :type (subst-type tysubst (type ast))))
-
 (defmethod manifest-ast ((ast bind) tysubst)
   (make-instance 'bind
     :variable (variable ast)

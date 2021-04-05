@@ -62,13 +62,6 @@
         :var lvar :value (convert value env type-env)
         :body (convertlis body new-env type-env)))))
 
-(defmethod convert-special ((operator (eql 'if)) rest env type-env)
-  (destructuring-bind (test then else) rest
-    (make-instance 'branch
-      :test (convert test env type-env)
-      :then (convert then env type-env)
-      :else (convert else env type-env))))
-
 (defmethod convert-special ((operator (eql 'with)) rest env type-env)
   (destructuring-bind ((var &optional (initializer nil initializerp))
                        &rest body)

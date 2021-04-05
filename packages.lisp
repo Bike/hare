@@ -14,6 +14,5 @@
            #:call #:callee #:args
            #:literal #:initializer
            #:reference #:variable
-           #:branch #:test #:then #:else
            #:bind #:value #:body)
   (:export #:unify))

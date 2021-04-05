@@ -316,18 +316,6 @@
     (prog1 (infer final tenv)
       (setf (type ast) (type final)))))
 
-(defmethod infer ((ast branch) tenv)
-  (let ((itest (infer (test ast) tenv))
-        (ithen (infer (then ast) tenv))
-        (ielse (infer (else ast) tenv))
-        (tt (unify (type (test ast)) (make-bool)))
-        (tu (unify (type (then ast)) (type (else ast)))))
-    (setf (type ast) (type (then ast)))
-    (subst-inference tt
-                     (subst-inference tu
-                                      (compose-inferences
-                                       (list itest ithen ielse))))))
-
 (defmethod infer ((ast bind) tenv)
   (let* ((value (value ast))
          (ivalue (infer (value ast) tenv))

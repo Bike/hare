@@ -42,7 +42,7 @@ initializer := symbol | integer | UNDEF | (ARRAY initializer*)
              | (LAMBDA (name*) form*)
 form := name | combination | literal
 literal := name | integer | (constructor literal*)
-combination := (LET (name form) form*) | (IF form form form) | (SEQ form*)
+combination := (LET (name form) form*) | (SEQ form*)
              | (CASE form ((constructor name*) form*)*)
              | (CASE! form ((constructor name*) form*)*)
              | (WITH (name [initializer]) form*)

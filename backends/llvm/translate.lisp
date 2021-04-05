@@ -122,36 +122,6 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 
 (defmethod translate-ast ((ast reference) env) (lookup (variable ast) env))
 
-(defmethod translate-ast ((ast branch) env)
-  (let ((condition (translate-ast (test ast) env))
-        (thenb (llvm:create-basic-block "then"))
-        (elseb (llvm:create-basic-block "else"))
-        (mergeb (llvm:create-basic-block "if")))
-    (llvm:build-cond-br *builder* condition thenb elseb)
-    (let* ((then
-             (progn
-               (llvm:position-builder-at-end *builder* thenb)
-               (translate-ast (then ast) env)))
-           (_ (unless (null then)
-                (llvm:build-br *builder* mergeb)))
-           (else
-             (progn
-               (llvm:position-builder-at-end *builder* elseb)
-               (translate-ast (else ast) env)))
-           (_2 (unless (null else)
-                 (llvm:build-br *builder* mergeb))))
-      (declare (ignore _ _2))
-      (cond
-        ((and then else)
-         (llvm:position-builder-at-end *builder* mergeb)
-         (let ((phi (llvm:build-phi
-                     *builder* (translate-type (hare::type ast)) "if")))
-           (llvm:add-incoming phi (list then else) (list thenb elseb))
-           phi))
-        (then)
-        (else)
-        (t nil)))))
-
 (defmethod translate-ast ((ast bind) env)
   (let* ((value (translate-ast (value ast) env))
          (_ (unless value (return-from translate-ast nil)))
