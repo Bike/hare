@@ -1,14 +1,5 @@
 (in-package #:hare-llvm)
 
-(defgeneric declare-initializer (initializer &key name))
-
-(defmethod declare-initializer ((initializer hare::lambda-initializer)
-                                &key (name ""))
-  (let ((type (translate-type (hare::type initializer))))
-    (llvm:add-function *module* name type)))
-
-;;;
-
 (defvar *module*)
 
 (defmacro with-module ((&rest args) &body body)
@@ -35,15 +26,30 @@
 
 ;;;
 
+(defgeneric declare-variable (type &key name))
+
+(defmethod declare-variable ((type hare:fun) &key (name ""))
+  (let ((type (translate-type type)))
+    (llvm:add-function *module* name type)))
+
+;;;
+
 (defun translate (manifest)
   (let* ((binds
            (append
+            (loop for ext in (hare::externs manifest)
+                  for name = (hare:name ext)
+                  for var = (hare:variable ext)
+                  for type = (hare::type ext)
+                  for val = (declare-variable type :name name)
+                  collect (cons var val))
             ;; TODO: externs here
             (loop for mani in (hare::manifestations manifest)
                   for name = (hare:name mani)
                   for var = (hare:variable mani)
                   for initializer = (hare:initializer mani)
-                  for val = (declare-initializer initializer :name name)
+                  for type = (hare::type initializer)
+                  for val = (declare-variable type :name name)
                   collect (cons var val))))
          (env (make-instance 'env :bindings binds)))
     (loop for mani in (hare::manifestations manifest)

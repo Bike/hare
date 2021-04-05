@@ -7,6 +7,7 @@
         collect (if c-name (list var ty c-name) (list var ty))))
 
 (defun single-module (exprs particulars &optional (to-file "/tmp/test.bc"))
+  (declare (optimize debug))
   (hare:with-type-cache ()
     (let* ((prem (hare::parse-pre-module exprs))
            (env (hare::environment prem))
@@ -27,9 +28,9 @@
                '((main
                   (function (int 32) (int 32) (pointer (pointer (int 8))))
                   "main")))
-(single-module '((defvar main (lambda (argc argv) (iscntrl argc))))
-               '((main
+(single-module '((defvar main (lambda (argc argv) (iscntrl argc)))
+               '((iscntrl (function (int 32) (int 32)) "iscntrl")
+                 (main
                   (function (int 32) (int 32) (pointer (pointer (int 8))))
-                  "main")
-                 (iscntrl (function (int 32) (int 32)) "iscntrl")))
+                  "main")))
 |#
