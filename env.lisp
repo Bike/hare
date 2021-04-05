@@ -53,7 +53,10 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
         (push (cons name new) (bindings environment))))
   new)
 
-(defun make-env (variables values &optional parent)
+(defun make-env (names values &optional parent)
   (let ((parent-bindings (if parent (bindings parent) nil)))
     (make-instance 'environment
-      :bindings (nconc (mapcar #'cons variables values) parent-bindings))))
+      :bindings (nconc (mapcar #'cons names values) parent-bindings))))
+
+(defun map-env (function env)
+  (loop for (name . info) in (bindings env) do (funcall function name info)))

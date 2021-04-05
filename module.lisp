@@ -20,13 +20,16 @@
     (let* ((varbinds (varbinds pre-module))
            (env (environment pre-module))
            (tmap
-             ;; FIXME: Breaking environment abstraction
-             (loop for (name . info) in (bindings env)
-                   for variable = (variable info)
-                   for sc = (or (declared-type info)
-                                (let ((tv (make-tvar name)))
-                                  (schema tv (list tv))))
-                   collect (cons variable sc)))
+             (let ((r nil))
+               (map-env (lambda (name info)
+                          (when (typep info 'variable-info)
+                            (let ((variable (variable info))
+                                  (sc (or (declared-type info)
+                                          (let ((tv (make-tvar name)))
+                                            (schema tv (list tv))))))
+                              (push (cons variable sc) r))))
+                        env)
+               r))
            (tenv (make-tenv tmap))
            (entries
              (loop for (variable . initializer) in varbinds
