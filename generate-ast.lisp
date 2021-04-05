@@ -59,8 +59,8 @@
            (info (make-instance 'variable-info :variable lvar))
            (new-env (make-env (list varname) (list info) env)))
       (make-instance 'bind
-        :var lvar :value (convert value env type-env)
-        :body (convertlis body new-env type-env)))))
+        :variable lvar :value (convert value env type-env)
+        :body (convert-seq body new-env type-env)))))
 
 (defmethod convert-special ((operator (eql 'with)) rest env type-env)
   (destructuring-bind ((var &optional (initializer nil initializerp))

@@ -327,8 +327,9 @@
          (valsc (schema valt))
          (variable (variable ast))
          (new-tenv (extend-tenv variable valsc new-tenv))
-         (ibody (infer (body ast) new-tenv)))
-    (setf (type ast) (type ibody))
+         (body (body ast))
+         (ibody (infer body new-tenv)))
+    (setf (type ast) (type body))
     (inference-sans (compose-inferences/2 ivalue ibody) (list variable))))
 
 #|
