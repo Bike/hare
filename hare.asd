@@ -7,6 +7,7 @@
   ((:file "packages")
    (:file "conditions" :depends-on ("packages"))
    (:file "env" :depends-on ("conditions" "packages"))
+   (:file "ground" :depends-on ("env" "packages"))
    (:file "type-env" :depends-on ("conditions" "packages"))
    (:file "type" :depends-on ("type-env" "packages"))
    (:file "polytype" :depends-on ("type" "packages"))
@@ -16,7 +17,7 @@
    (:file "literal" :depends-on ("type-env" "env" "packages"))
    (:file "generate-ast" :depends-on ("literal" "type" "env" "packages"))
    (:file "phase0" :depends-on ("type" "env" "packages"))
-   (:file "phase0parse" :depends-on ("phase0" "env" "type-env" "type"
+   (:file "phase0parse" :depends-on ("phase0" "ground" "env" "type-env" "type"
                                               "literal" "packages"))
    (:file "infer" :depends-on ("type" "literal" "ast" "packages"))
    (:file "module" :depends-on ("parse-type" "infer" "literal" "env"

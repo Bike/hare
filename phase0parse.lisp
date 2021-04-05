@@ -35,8 +35,7 @@
   (values))
 
 (defun parse-pre-module (toplevel-exprs
-                         &optional (env (make-env nil nil))
-                           (tenv (make-type-env)))
+                         &optional (env (make-stdenv)) (tenv (make-type-env)))
   (let ((module (make-instance 'pre-module :env env :type-env tenv)))
     (loop for expr in toplevel-exprs
           do (add-1-TL-to-pre-module module expr))
