@@ -12,4 +12,5 @@
       ((:file "package")
        (:file "type" :depends-on ("package"))
        (:file "translate" :depends-on ("type" "package"))
+       #+(or)
        (:file "main" :depends-on ("translate" "package"))))))))

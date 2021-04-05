@@ -1,31 +1,35 @@
 (in-package #:hare-llvm)
 
-(defun single-module (forms &optional (to-file "/tmp/test.bc"))
-  (hare::with-type-cache ()
-    (let* ((module (hare::parse-module forms))
-           (exports (hare::exports module))
-           (export-map (loop for (var type) in exports
-                             collect (cons var type)))
-           (needed (hare::manifest module export-map)))
+(defun process-particulars (particulars env tyenv)
+  (loop for (name tyexpr c-name) in particulars
+        for var = (hare:variable (hare::lookup name env))
+        for ty = (hare::parse-type tyexpr tyenv)
+        collect (if c-name (list var ty c-name) (list var ty))))
+
+(defun single-module (exprs particulars &optional (to-file "/tmp/test.bc"))
+  (hare:with-type-cache ()
+    (let* ((prem (hare::parse-pre-module exprs))
+           (env (hare::environment prem))
+           (tyenv (hare::type-env prem))
+           (mod (hare::module prem))
+           (particulars (process-particulars particulars env tyenv))
+           (manifest (hare::manifest mod particulars)))
       (with-module ("test")
-        (bindings->llvm needed exports (hare::externs module))
+        (translate manifest)
         (llvm:verify-module *module*)
         (llvm:write-bitcode-to-file *module* to-file)))))
 
 #| ;; e.g.
-(single-module '((defvar main (lambda () 0))
-                 (export main (function (hare:int 32)) "main")))
+(single-module '((defvar main (lambda () 0)))
+               '((main (function (int 32)) "main")))
 (single-module '((defvar main (lambda (argc argv) (id argc)))
-                 (export main (function (hare:int 32)
-                               (hare:int 32) (hare:pointer
-                                              (hare:pointer (hare:int 8))))
+                 (defvar id (lambda (x) x)))
+               '((main
+                  (function (int 32) (int 32) (pointer (pointer (int 8))))
+                  "main")))
+(single-module '((defvar main (lambda (argc argv) (iscntrl argc))))
+               '((main
+                  (function (int 32) (int 32) (pointer (pointer (int 8))))
                   "main")
-                 (defvar id (lambda (x) x))))
-(single-module '((defvar main (lambda (argc argv) (iscntrl argc)))
-                 (export main (function (hare:int 32)
-                               (hare:int 32) (hare:pointer
-                                              (hare:pointer (hare:int 8))))
-                  "main")
-                 (hare::extern iscntrl (function (hare:int 32) (hare:int 32))
-                  "iscntrl")))
+                 (iscntrl (function (int 32) (int 32)) "iscntrl")))
 |#

@@ -94,13 +94,14 @@
 
 ;;; A monotyped variable.
 (defclass manifestation ()
-  ((%variable :initarg :variable :reader variable)
-   (%type :initarg :type :reader type)
+  ((%name :initarg :name :reader name :type string)
+   (%variable :initarg :variable :reader variable)
    (%initializer :initarg :initializer :reader initializer :type initializer)))
 
 ;;; A variable that is defined elsewhere, but still has a monotype.
 (defclass extern ()
-  ((%variable :initarg :variable :reader variable)
+  ((%name :initarg :name :reader name :type string)
+   (%variable :initarg :variable :reader variable)
    (%type :initarg :type :reader type)))
 
 (defclass manifest ()
@@ -113,12 +114,17 @@
                   (type= (type manifest) type)))
            manifestations))
 
-(defun %manifest (module alist) ; alist of (variable . monotype)
+(defun mangle (name type)
+  ;; FIXME
+  (format nil "~a_~a" name (unparse-type type)))
+
+(defun %manifest (module particulars) ; alist of (variable monotype [c-name])
+  (declare (optimize debug))
   (loop with complete = nil with externs = nil
-        with worklist = alist
+        with worklist = particulars
         with entries = (entries module)
-        for (var . type) = (or (pop worklist)
-                               (return (values complete externs)))
+        for (var type name) = (or (pop worklist)
+                                  (return (values complete externs)))
         for entry = (find var entries :key #'variable)
         if entry
           do (unless (%find-manifest var type complete)
@@ -127,21 +133,24 @@
                       (initializer (manifest-initializer einitializer tysubst))
                       (infer (inference entry))
                       (new (make-instance 'manifestation
-                             :variable var :type type :initializer initializer))
+                             :name (or name (mangle (name var) type))
+                             :variable var :initializer initializer))
                       (varmap (varmap infer))
                       (svarmap (subst-map tysubst varmap)))
                  ;; FIXME? We're treating a varmap as an alist directly here,
                  ;; breaking abstraction
                  (loop for (vvar . vtypes) in svarmap
-                       do (loop for vtype in vtypes
-                                do (push (cons vvar vtype) worklist)))
+                       do (loop for vtype1 in vtypes
+                                for vtype2 = (pointer-type-underlying vtype1)
+                                do (push (list vvar vtype2) worklist)))
                  (push new complete)))
         else
           do (unless (%find-manifest var type externs)
                (push (make-instance 'extern
+                       :name (or name (mangle (name var) type))
                        :variable var :type type)
                      externs))))
 
-(defun manifest (module alist)
-  (multiple-value-bind (manifestations externs) (%manifest module alist)
+(defun manifest (module particulars)
+  (multiple-value-bind (manifestations externs) (%manifest module particulars)
     (make-instance 'manifest :manifestations manifestations :externs externs)))
