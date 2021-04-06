@@ -67,7 +67,7 @@
                t2))
 
 (defmethod unify/2 ((t1 tvar) (t2 type))
-  (cond ((type= t1 t2) nil)
+  (cond ((type= t1 t2) (empty-tysubst))
         ((occurs t1 t2)
          (error "Failed occurs check: ~s ~s" t1 t2))
         (t (make-tysubst (list (cons t1 t2))))))
@@ -75,7 +75,7 @@
 
 (defmethod unify/2 ((t1 int) (t2 int))
   (if (= (int-type-length t1) (int-type-length t2))
-      nil
+      (empty-tysubst)
       (call-next-method)))
 
 (defmethod unify/2 ((t1 pointer) (t2 pointer))
@@ -383,7 +383,12 @@
          (iargs (loop for arg in args collect (infer arg tenv)))
          (callee (callee ast))
          (icallee (infer callee tenv))
-         (rett (make-tvar '#:ret))
+         (retname (if (typep callee 'reference)
+                      (concatenate 'string
+                                   (symbol-name (name (variable callee)))
+                                   "-RET")
+                      "RET"))
+         (rett (make-tvar (gensym retname)))
          (csubst (unify (type callee)
                         (make-pointer
                          (make-fun rett (mapcar #'type args))))))
