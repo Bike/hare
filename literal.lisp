@@ -91,6 +91,10 @@
    (%params :accessor params :initarg :params :type list)
    (%body :accessor body :initarg :body :type ast)))
 
+(defmethod print-object ((i lambda-initializer) stream)
+  (print-unreadable-object (i stream :type t)
+    (write (mapcar #'name (params i)) :stream stream)))
+
 (defclass array-initializer (initializer)
   (;; A list of initializers.
    (%elements :accessor elements :initarg :elements :type list)))

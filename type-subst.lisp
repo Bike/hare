@@ -5,6 +5,18 @@
   (;; An alist (tvar . type)
    (%bindings :initarg :bindings :accessor bindings)))
 
+(defmethod print-object ((o tysubst) s)
+  (print-unreadable-object (o s :type t)
+    (write-char #\( s)
+    (loop for ((tvar . type) . rest) on (bindings o)
+          do (write-char #\( s)
+             (write (name tvar) :stream s)
+             (write-char #\Space s)
+             (write (unparse-type type) :stream s)
+             (write-char #\) s)
+          unless (null rest) do (write-char #\Space))
+    (write-char #\) s)))
+
 (defun empty-tysubst () (make-instance 'tysubst :bindings ()))
 
 (defun make-tysubst (map) (make-instance 'tysubst :bindings map))
