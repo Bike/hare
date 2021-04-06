@@ -91,11 +91,19 @@
    (%variable :initarg :variable :reader variable)
    (%initializer :initarg :initializer :reader initializer :type initializer)))
 
+(defmethod print-object ((o manifestation) s)
+  (print-unreadable-object (o s :type t)
+    (write (name (variable o)) :stream s)))
+
 ;;; A variable that is defined elsewhere, but still has a monotype.
 (defclass extern ()
   ((%name :initarg :name :reader name :type string)
    (%variable :initarg :variable :reader variable)
    (%type :initarg :type :reader type)))
+
+(defmethod print-object ((o extern) s)
+  (print-unreadable-object (o s :type t)
+    (write (name (variable o)) :stream s)))
 
 (defclass manifest ()
   ((%manifestations :initarg :manifestations :reader manifestations :type list)
