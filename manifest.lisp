@@ -87,35 +87,32 @@
 
 ;;;
 
-;;; A monotyped variable.
+;;; Abstract.
 (defclass manifestation ()
-  ((%name :initarg :name :reader name :type string)
-   (%variable :initarg :variable :reader variable)
-   (%initializer :initarg :initializer :reader initializer :type initializer)))
+  ((%name :initarg :name :initform nil :accessor name :type (or string null))
+   (%variable :initarg :variable :reader variable :type variable)))
 
 (defmethod print-object ((o manifestation) s)
   (print-unreadable-object (o s :type t)
     (write (name (variable o)) :stream s)))
 
-;;; A variable that is defined elsewhere, but still has a monotype.
-(defclass extern ()
-  ((%name :initarg :name :reader name :type string)
-   (%variable :initarg :variable :reader variable)
-   (%type :initarg :type :reader type)))
+;;; A monotyped variable.
+(defclass monodef (manifestation)
+  ((%initializer :initarg :initializer :reader initializer :type initializer)))
 
-(defmethod print-object ((o extern) s)
-  (print-unreadable-object (o s :type t)
-    (write (name (variable o)) :stream s)))
+;;; A variable that is defined elsewhere, but still has a monotype.
+(defclass extern (manifestation)
+  ((%type :initarg :type :reader type)))
 
 (defclass manifest ()
-  ((%manifestations :initarg :manifestations :reader manifestations :type list)
+  ((%monodefs :initarg :monodefs :reader monodefs :type list)
    (%externs :initarg :externs :reader externs :type list)))
 
-(defun %find-manifest (variable type manifestations)
+(defun %find-manifest (variable type monodefs)
   (find-if (lambda (manifest)
              (and (eq (variable manifest) variable)
                   (type= (type manifest) type)))
-           manifestations))
+           monodefs))
 
 (defun mangle (name type)
   ;; FIXME
@@ -126,34 +123,62 @@
   (loop with complete = nil with externs = nil
         with worklist = particulars
         with entries = (entries module)
-        for (var type name) = (or (pop worklist)
-                                  (return (values complete externs)))
+        for (var type name)
+          = (or (pop worklist)
+                (progn
+                  (loop for mono in complete
+                        unless (name mono)
+                          do (setf (name mono)
+                                   (mangle (name (variable mono))
+                                           (type (initializer mono)))))
+                  (loop for extern in externs
+                        unless (name extern)
+                          do (setf (name extern)
+                                   (mangle (name (variable extern))
+                                           (type extern))))
+                  (return (values complete externs))))
         for entry = (find var entries :key #'variable)
         if entry
-          do (unless (%find-manifest var type complete)
-               (let* ((einitializer (initializer entry))
-                      (tysubst (unify type (type einitializer)))
-                      (initializer (manifest-initializer einitializer tysubst))
-                      (infer (inference entry))
-                      (new (make-instance 'manifestation
-                             :name (or name (mangle (name var) type))
-                             :variable var :initializer initializer))
-                      (varmap (varmap infer))
-                      (svarmap (subst-map tysubst varmap)))
-                 ;; FIXME? We're treating a varmap as an alist directly here,
-                 ;; breaking abstraction
-                 (loop for (vvar . vtypes) in svarmap
-                       do (loop for vtype1 in vtypes
-                                for vtype2 = (pointer-type-underlying vtype1)
-                                do (push (list vvar vtype2) worklist)))
-                 (push new complete)))
+          do (let ((existing (%find-manifest var type complete)))
+               (if existing
+                   ;; maybe set name
+                   (when name
+                     (if (name existing)
+                         (error "Duplicate names for ~a" var)
+                         (setf (name existing) name)))
+                   ;; new entry
+                   (let* ((einitializer (initializer entry))
+                          (tysubst (unify type (type einitializer)))
+                          (initializer
+                            (manifest-initializer einitializer tysubst))
+                          (infer (inference entry))
+                          (new (make-instance 'monodef
+                                 :name name
+                                 :variable var :initializer initializer))
+                          (varmap (varmap infer))
+                          (svarmap (subst-map tysubst varmap)))
+                     ;; FIXME? We're treating a varmap as an alist directly
+                     ;; here, breaking abstraction
+                     (loop for (vvar . vtypes) in svarmap
+                           do (loop for vtype1 in vtypes
+                                    for vtype2 = (pointer-type-underlying
+                                                  vtype1)
+                                    do (push (list vvar vtype2) worklist)))
+                     (push new complete))))
         else
-          do (unless (%find-manifest var type externs)
-               (push (make-instance 'extern
-                       :name (or name (mangle (name var) type))
-                       :variable var :type type)
-                     externs))))
+          do (let ((existing (%find-manifest var type externs)))
+               (if existing
+                   ;; maybe set the name
+                   (when name
+                     (if (name existing)
+                         (error "Duplicate names for ~a" var)
+                         (setf (name existing) name)))
+                   ;; make new extern
+                   (push (make-instance 'extern
+                           :name name
+                           :variable var :type type)
+                         externs)))))
 
 (defun manifest (module particulars)
-  (multiple-value-bind (manifestations externs) (%manifest module particulars)
-    (make-instance 'manifest :manifestations manifestations :externs externs)))
+  (multiple-value-bind (monodefs externs) (%manifest module particulars)
+    (make-instance 'manifest :monodefs monodefs :externs externs)))

@@ -44,7 +44,7 @@
                   for val = (declare-variable type :name name)
                   collect (cons var val))
             ;; TODO: externs here
-            (loop for mani in (hare::manifestations manifest)
+            (loop for mani in (hare::monodefs manifest)
                   for name = (hare:name mani)
                   for var = (hare:variable mani)
                   for initializer = (hare:initializer mani)
@@ -52,7 +52,7 @@
                   for val = (declare-variable type :name name)
                   collect (cons var val))))
          (env (make-instance 'env :bindings binds)))
-    (loop for mani in (hare::manifestations manifest)
+    (loop for mani in (hare::monodefs manifest)
           for var = (hare:variable mani)
           for initializer = (hare:initializer mani)
           for val = (or (cdr (assoc var binds)) (error "HOW??"))
