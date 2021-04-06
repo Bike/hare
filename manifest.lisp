@@ -68,7 +68,8 @@
   (make-instance 'bind
     :variable (variable ast)
     :value (manifest-ast (value ast) tysubst)
-    :body (manifest-ast (body ast) tysubst)))
+    :body (manifest-ast (body ast) tysubst)
+    :type (subst-type tysubst (type ast))))
 
 (defun manifest-case-clause (clause tysubst)
   (make-instance 'case-clause
@@ -81,7 +82,8 @@
     :value (manifest-ast (value ast) tysubst)
     :clauses (loop for clause in (clauses ast)
                    collect (manifest-case-clause clause tysubst))
-    :adt-def (adt-def ast) :case!p (case!p ast)))
+    :adt-def (adt-def ast) :case!p (case!p ast)
+    :type (subst-type tysubst (type ast))))
 
 ;;;
 
