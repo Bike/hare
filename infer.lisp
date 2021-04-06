@@ -55,8 +55,10 @@
 (defun unify-pairwise (typelist1 typelist2)
   (loop with tysubst = (empty-tysubst)
         for t1 in typelist1
+        for st1 = (subst-type tysubst t1)
         for t2 in typelist2
-        do (setf tysubst (compose-tysubst (unify/2 t1 t2) tysubst))
+        for st2 = (subst-type tysubst t2)
+        do (setf tysubst (compose-tysubst (unify/2 st1 st2) tysubst))
         finally (return tysubst)))
 
 ;; Does t1 occur in t2?
