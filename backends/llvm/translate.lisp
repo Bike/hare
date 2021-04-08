@@ -26,11 +26,20 @@
 
 ;;;
 
-(defgeneric declare-variable (type &key name))
+(defgeneric declare-variable (type &key name initializer))
 
-(defmethod declare-variable ((type hare:fun) &key (name ""))
+(defmethod declare-variable ((type hare:fun) &key (name "") initializer)
+  (declare (ignore initializer))
   (let ((type (translate-type type)))
     (llvm:add-function *module* name type)))
+
+(defmethod declare-variable ((type hare:arrayt) &key (name "") initializer)
+  (let* ((etype (translate-type (hare:arrayt-element-type type)))
+         (len (if initializer (length (hare::elements initializer)) 0))
+         (etype* (llvm:array-type etype len))
+         (glob (llvm:add-global *module* etype* name)))
+    (setf (llvm:alignment glob) 8)
+    glob))
 
 ;;;
 
@@ -49,7 +58,8 @@
                   for var = (hare:variable mani)
                   for initializer = (hare:initializer mani)
                   for type = (hare::type initializer)
-                  for val = (declare-variable type :name name)
+                  for val = (declare-variable type :name name
+                                                   :initializer initializer)
                   collect (cons var val))))
          (env (make-instance 'env :bindings binds)))
     (loop for mani in (hare::monodefs manifest)
@@ -84,6 +94,16 @@
         (unless (null r)
           (llvm:build-ret *builder* r)))
       function)))
+
+(defmethod translate-initializer ((init hare::array-initializer)
+                                  var global-env)
+  (let* ((etype (type->llvm (hare:arrayt-element-type (hare::type init))))
+         (const (llvm:const-array etype
+                                  ;; KLUDGE?
+                                  (mapcar #'translate-literal
+                                          (hare::elements init)))))
+    (llvm:set-initializer var const)
+    var))
 
 ;;;
 
@@ -120,7 +140,18 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
   (declare (ignore env))
   (translate-literal (initializer ast)))
 
-(defmethod translate-ast ((ast reference) env) (lookup (variable ast) env))
+(defun gepify (value)
+  (let ((zero (llvm:const-int (llvm:int64-type) 0)))
+    (llvm:build-in-bounds-gep *builder* value (list zero zero) "darr")))
+
+(defun maybe-gepify (value type)
+  (if (and (typep type 'hare::pointer)
+           (typep (hare:pointer-type-underlying type) 'hare::arrayt))
+      (gepify value)
+      value))
+
+(defmethod translate-ast ((ast reference) env)
+  (maybe-gepify (lookup (variable ast) env) (hare::type ast)))
 
 (defmethod translate-ast ((ast bind) env)
   (let* ((value (translate-ast (value ast) env))

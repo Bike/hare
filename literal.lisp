@@ -36,9 +36,8 @@
 ;;; it is initialized, and that doing so is undefined behavior. This allows
 ;;; things to be only partially initialized if that's convenient.
 ;;;
-;;; Because I don't think it's possible to indicate in C, lambda initializers
+;;; Because I don't think it's possible to indicate in LLVM, lambda initializers
 ;;; are currently only valid at top level. FIXME.
-;;; Array initializers, including bytes, are not implemented. FIXME.
 ;;;
 ;;; NOTE: The array (not arrayn), bytes, and lambda initializer types kind
 ;;; of imply some accessible storage when used other than a defvar.
