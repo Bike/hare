@@ -100,6 +100,8 @@
 (defclass monodef (manifestation)
   ((%initializer :initarg :initializer :reader initializer :type initializer)))
 
+(defmethod type ((md monodef)) (type (initializer md)))
+
 ;;; A variable that is defined elsewhere, but still has a monotype.
 (defclass extern (manifestation)
   ((%type :initarg :type :reader type)))
@@ -109,6 +111,7 @@
    (%externs :initarg :externs :reader externs :type list)))
 
 (defun %find-manifest (variable type monodefs)
+  (declare (optimize debug))
   (find-if (lambda (manifest)
              (and (eq (variable manifest) variable)
                   (type= (type manifest) type)))
