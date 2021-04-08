@@ -106,8 +106,10 @@
       ;; I think this is fine?
       (loop with tysubst = (empty-tysubst)
             with type1 = (first types)
+            for stype1 = (subst-type tysubst type1)
             for type2 in (rest types)
-            do (setf tysubst (compose-tysubst (unify/2 type1 type2) tysubst))
+            for stype2 = (subst-type tysubst type2)
+            do (setf tysubst (compose-tysubst (unify/2 stype1 stype2) tysubst))
             finally (return tysubst))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -223,7 +225,7 @@
 (defmethod infer-initializer ((initializer integer-initializer) tenv)
   (declare (ignore tenv))
   ;; Must be an integer type, but we can't express that in the type system.
-  (setf (type initializer) (make-tvar '#:integer))
+  (setf (type initializer) (make-tvar (gensym "INTEGER") #+(or)'#:integer))
   (empty-inference))
 
 (defmethod infer-initializer ((initializer variable-initializer) tenv)
@@ -251,9 +253,9 @@
     (if elements
         (let* ((eleminferences (loop for element in elements
                                      collect (infer-initializer element tenv)))
-               (elemtys (mapcar #'type elements))
-               (u (apply #'unify elemtys)))
-          (setf (type initializer) (make-arrayt (first elemtys)))
+               (u (apply #'unify (mapcar #'type elements)))
+               (elemty (subst-type u (type (first elements)))))
+          (setf (type initializer) (make-arrayt elemty))
           (subst-inference u (compose-inferences eleminferences)))
         (let ((ty (make-tvar '#:array)))
           (setf (type initializer) (make-arrayt ty))
