@@ -40,6 +40,16 @@ Type forall T. (Escape T)
 
 Type of objects created and used by the `let/ec` operator and `escape` function, representing the possibility of returning a value of type T. Escapes are sized types [i.e. they are first class objects, not just in memory like arrays, and can be stored and loaded]. Beyond these properties no particular behavior or representation of these objects is defined.
 
+Tagbody
+-------
+
+This is a little too high level, surprisingly. It does not support repeatedly rewinding to the same frame. This is possible with something like Lisp's `tagbody` - it's an escape plus goto. A decent operator pair here would be
+
+`(eblocks tb (prologue-form*) (tag (param*) bodyform*)*)`
+`(ego tag tb arg*)`
+
+with type Tagbody. The tag names are symbols which are lexically bound within the `eblocks`, while the Tagbody, representing the frame, has dynamic extent. `ego` to a tag transfers control to the first appropriate bodyform, with the params bound to the args. Then `(let/ec esc ...)` = `(eblocks esc ((ego ret (seq ...))) (ret (v) v))` except `eblocks` returns inert probably? whoops.
+
 Unwinding
 ---------
 
