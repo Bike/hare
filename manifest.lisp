@@ -87,6 +87,14 @@
 
 ;;;
 
+(defun check-initializer-typed (initializer)
+  (let ((f (free (type initializer))))
+    (unless (null f)
+      (error "Initializer ~a incompletely manifested as type ~a"
+             initializer f))))
+
+;;;
+
 ;;; Abstract.
 (defclass manifestation ()
   ((%name :initarg :name :initform nil :accessor name :type (or string null))
@@ -160,6 +168,7 @@
                                  :variable var :initializer initializer))
                           (varmap (varmap infer))
                           (svarmap (subst-map tysubst varmap)))
+                     (check-initializer-typed initializer)
                      ;; FIXME? We're treating a varmap as an alist directly
                      ;; here, breaking abstraction
                      (loop for (vvar . vtypes) in svarmap
