@@ -382,6 +382,17 @@
         csubst
         (compose-inferences (list* ivalue iclauses)))))))
 
+(defmethod infer ((ast construct) tenv)
+  (let* ((constructor (constructor ast))
+         (def (adt-def constructor))
+         (args (args ast))
+         (iargs (loop for arg in args collect (infer arg tenv))))
+    (multiple-value-bind (adt conslist) (instantiate-adt-def def)
+      (let* ((cs (cdr (assoc constructor conslist)))
+             (s (unify-pairwise cs (mapcar #'type args))))
+        (setf (type ast) (subst-type s adt))
+        (subst-inference s (compose-inferences iargs))))))
+
 (defmethod infer ((ast call) tenv)
   (let* ((args (args ast))
          (iargs (loop for arg in args collect (infer arg tenv)))

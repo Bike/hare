@@ -120,6 +120,11 @@
 (defmethod convert-special ((operator (eql 'case!)) args env type-env)
   (convert-case operator args env type-env))
 
+(defmethod convert-special ((operator (eql 'cons)) args env type-env)
+  (make-instance 'construct
+    :constructor (find-constructor (first args) type-env)
+    :args (convertlis (rest args) env type-env)))
+
 (defmethod convert-special ((operator (eql 'quote)) args env type-env)
   (destructuring-bind (spec) args
     (make-instance 'literal

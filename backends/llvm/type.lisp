@@ -37,20 +37,32 @@
 (defmethod type->llvm ((type arrayt))
   (type->llvm (arrayt-element-type type)))
 
+(defun constructor->llvm (constructor map)
+  (let ((struct (llvm:struct-create-named
+                 ;; TODO: Put the parameter types in the name.
+                 (string-downcase (symbol-name (hare:name constructor))))))
+    (llvm:struct-set-body struct
+                          (loop for field in (hare::fields constructor)
+                                collect (type->llvm
+                                         (hare::subst-type map field))))
+    struct))
+
+;; We want multiple type->llvm calls on the same struct type to return the same
+;; LLVM type.
+(defvar *types*)
+
+(defmethod type->llvm :around ((type adt))
+  (or (values (gethash type *types*))
+      (setf (gethash type *types*) (call-next-method))))
+
 (defmethod type->llvm ((type adt))
   (let* ((def (adt-def type))
          (args (adt-args type))
          (tvars (tvars def))
-         (map (mapcar #'cons tvars args))
+         (map (hare::make-tysubst (mapcar #'cons tvars args)))
          (structs
-           (loop for member in (members def)
-                 for constructor in (constructors def)
-                 for smember = (loop for mtype in member
-                                     collect (subst-type map mtype))
-                 for struct = (llvm:struct-create-named
-                               (string-downcase (symbol-name constructor)))
-                 do (llvm:struct-set-body struct smember)
-                 collect struct))
+           (loop for constructor in (constructors def)
+                 collect (constructor->llvm constructor map)))
          (nstructs (length structs)))
     (case nstructs
       (0 (let ((st (llvm:struct-create-named "")))

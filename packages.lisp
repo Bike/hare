@@ -14,5 +14,6 @@
            #:call #:callee #:args
            #:literal #:initializer
            #:reference #:variable
-           #:bind #:value #:body)
+           #:bind #:value #:body
+           #:case #:construct)
   (:export #:unify))

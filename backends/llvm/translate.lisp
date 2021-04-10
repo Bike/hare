@@ -136,6 +136,20 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
     ;; FIXME
     (llvm:build-call *builder* callee args "")))
 
+(defmethod translate-ast ((ast construct) env)
+  (let* ((ty (type->llvm (hare::type ast)))
+         (args (loop for arg in (args ast)
+                     for value = (translate-ast arg env)
+                     when (null value)
+                       do (return-from translate-ast nil)
+                     else collect value))
+         (str (llvm:undef ty)))
+    (loop for arg in args
+          for i from 0
+          do (setf str
+                   (llvm:build-insert-value *builder* str arg i "")))
+    str))
+
 (defmethod translate-ast ((ast literal) env)
   (declare (ignore env))
   (translate-literal (initializer ast)))

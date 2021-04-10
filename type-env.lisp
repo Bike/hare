@@ -11,7 +11,7 @@ and ADD-TYPE modify one.
 
 (defclass type-env ()
   (;; Type aliases. List of (name (tvar*) type)
-   (%aliases :initform (make-hash-table :test #'eq) :initarg :aliases
+   (%aliases :initform nil :initarg :aliases
              :accessor aliases :type list)
    ;; ADTs
    (%by-name :initform (make-hash-table :test #'eq) :initarg :by-name

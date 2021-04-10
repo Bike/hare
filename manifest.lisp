@@ -85,6 +85,13 @@
     :adt-def (adt-def ast) :case!p (case!p ast)
     :type (subst-type tysubst (type ast))))
 
+(defmethod manifest-ast ((ast construct) tysubst)
+  (make-instance 'construct
+    :constructor (constructor ast)
+    :args (loop for arg in (args ast)
+                collect (manifest-ast arg tysubst))
+    :type (subst-type tysubst (type ast))))
+
 ;;;
 
 (defun check-initializer-typed (initializer)

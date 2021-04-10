@@ -12,6 +12,10 @@ A form is either
    * (case! form ((constructor var*) form*)*) is like case, but form must
      evalaute to a pointer to an ADT. The vars are bound to pointers
      to the constructor fields. The ADT may be sized or unsized.
+   * (cons constructor form*) constructs an ADT value.
+     This is a special operator that probably won't be exposed in the final
+     language definition; instead a higher level defadt will define functions
+     to do it. But the compiler has to have some idea of what it's doing.
    * (with (var [initializer]) form*) allocates a value on the stack.
      The variable named symbol is bound to a pointer to a value of
       the inferred type. If this type is unsized, an initializer must
@@ -185,6 +189,17 @@ Forces the pointer to point to the particular constructor type, as expected.
                              :constructor (constructor clause)
                              :variables (variables clause)
                              :body (map-ast function (body clause))))))
+
+(defclass construct (ast)
+  ((%constructor :initarg :constructor :accessor constructor
+                 :type constructor)
+   ;; a list of ASTs
+   (%args :initarg :args :accessor args :type list)))
+(defmethod mapnil-ast (function (ast construct))
+  (mapnil-asts function (args ast)))
+(defmethod map-ast (function (ast construct))
+  :constructor (constructor ast)
+  :args (map-asts function (args ast)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
