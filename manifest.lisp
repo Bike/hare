@@ -132,9 +132,40 @@
                   (type= (type manifest) type)))
            monodefs))
 
+(defun mangle-count (n)
+  (check-type n (integer 0))
+  (let* ((str (write-to-string n :base 16))
+         (L (length str)))
+    (check-type L (integer 0 15))
+    (concatenate 'string (write-to-string L :base 16) str)))
+
+(defgeneric mangle-type (type))
+(defmethod mangle-type ((type int))
+  (concatenate 'string "i" (mangle-count (int-type-length type))))
+(defmethod mangle-type ((type pointer))
+  (concatenate 'string "p" (mangle-type (pointer-type-underlying type))))
+(defmethod mangle-type ((type fun))
+  (apply #'concatenate 'string "f"
+         (mangle-count (length (parameters type)))
+         (mangle-type (fun-return type))
+         (mapcar #'mangle-type (parameters type))))
+(defmethod mangle-type ((type arrayt))
+  (concatenate 'string "a" (mangle-type (arrayt-element-type type))))
+(defmethod mangle-type ((type adt))
+  (let* ((def (adt-def type))
+         (name (name def))
+         (sname (string-downcase (write-to-string name)))
+         (Lname (length sname))
+         (args (adt-args type)))
+    (apply #'concatenate 'string "c" ; custom, since A is taken
+           (mangle-count Lname)
+           sname
+           (mangle-count (length args))
+           (mapcar #'mangle-type args))))
+
 (defun mangle (name type)
   ;; FIXME
-  (format nil "~a_~a" name (unparse-type type)))
+  (format nil "~a_~a" name (mangle-type type)))
 
 (defun %manifest (module particulars) ; alist of (variable monotype [c-name])
   (declare (optimize debug))
