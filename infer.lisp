@@ -358,19 +358,23 @@
 |#
 
 (defmethod infer ((ast case) tenv)
-  (when (case!p ast) (error "not implemented yet"))
   (multiple-value-bind (tapp cmap) (instantiate-adt-def (adt-def ast))
-    (let* ((clauses (clauses ast))
+    (let* ((!p (case!p ast))
+           (rtapp (if !p (make-pointer tapp) tapp))
+           (clauses (clauses ast))
            (value (value ast))
            (ivalue (infer value tenv))
-           (vsubst (unify (type value) tapp))
+           (vsubst (unify (type value) rtapp))
            (iclauses
              (loop for clause in clauses
                    for constructor = (constructor clause)
                    for variables = (variables clause)
                    for fieldtys = (cdr (assoc constructor cmap :test #'eq))
+                   for rfieldtys = (if !p
+                                       (mapcar #'make-pointer fieldtys)
+                                       fieldtys)
                    ;; Note that case bindings are monomorphic.
-                   for fieldscs = (mapcar #'schema fieldtys)
+                   for fieldscs = (mapcar #'schema rfieldtys)
                    for new-tenv = (extend-tenv-list variables fieldscs tenv)
                    for prei = (infer (body clause) new-tenv)
                    collect (inference-sans prei variables)))
