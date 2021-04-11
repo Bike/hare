@@ -174,7 +174,7 @@ Forces the pointer to point to the particular constructor type, as expected.
    ;; A proper list of CASE-CLAUSEs.
    (%clauses :initarg :clauses :accessor clauses :type list)
    ;; Is this case!, the pointer version?
-   (%case!p :initarg :case!p :accessor case!p :type bool)))
+   (%case!p :initarg :case!p :accessor case!p :type boolean)))
 (defmethod mapnil-ast (function (ast case))
   (mapnil-ast function (value ast))
   (loop for clause in (clauses ast)

@@ -45,10 +45,6 @@ The types byte and word are predefined. They are integer types for
 the target architecture's smallest addressable unit and most
 conveniently addressable unit, respectively. byte-bits and word-bits
 constants are integers with the given n's.
-
-The type bool is predefined as (int 1). Constants true and false are
-available; their values as integers are not defined.
-
 |#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -131,14 +127,12 @@ available; their values as integers are not defined.
     (or (funcall function type) (call-next-method))))
 
 ;;; integer type. length is in bits.
-;;; (int 1) doubles as bool.
 (defclass int (type)
   ((%length :initarg :length :accessor int-type-length
             :type (integer 0))))
 (defun make-int (len)
   (or (cached-int len)
       (setf (cached-int len) (make-instance 'int :length len))))
-(defun make-bool () (make-int 1))
 (defmethod mapnil-type (function (type int)) (declare (ignore function)))
 (defmethod map-type (function (type int))
   (declare (ignore function))
