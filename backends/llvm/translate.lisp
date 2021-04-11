@@ -136,19 +136,67 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
     ;; FIXME
     (llvm:build-call *builder* callee args "")))
 
+(defgeneric construct (layout adt constructor &rest args))
+(defmethod construct ((layout direct-layout) adt constructor &rest args)
+  (declare (ignore adt constructor))
+  (let ((str (llvm:undef (ltype layout))))
+    (loop for arg in args
+          for i from 0
+          do (setf str (llvm:build-insert-value *builder* str arg i "")))
+    str))
+(defgeneric wordify (type value))
+(defmethod wordify ((type hare:int) value)
+  (list (if (< (hare:int-type-length type) 64)
+            (llvm:build-z-ext *builder* value (llvm:int64-type) "")
+            value)))
+(defmethod wordify ((type hare:pointer) value)
+  (list (llvm:build-pointer-to-int *builder* value (llvm:int64-type) "")))
+(defmethod wordify ((type hare:adt) value)
+  (if (direct-layout-adt-p type)
+      (list* (llvm:const-int (llvm:int64-type) 0) ; tag
+             (let* ((def (hare:adt-def type))
+                    (tvars (hare:tvars def))
+                    (args (hare:adt-args type))
+                    (map (hare::make-tysubst (mapcar #'cons tvars args)))
+                    (constructor
+                     (first (hare:constructors (hare:adt-def type)))))
+               (loop for field in (hare::fields constructor)
+                     for rfield = (hare::subst-type map field)
+                     for i from 0
+                     for stref = (llvm:build-extract-value
+                                  *builder* value i "")
+                     appending (wordify rfield stref))))
+      (loop for i from 0 below (nwords type)
+            collecting (llvm:build-extract-value *builder* value i ""))))
+(defmethod construct ((layout dumb-layout) adt constructor &rest args)
+  (let* ((str (llvm:undef (ltype layout)))
+         (def (hare:adt-def constructor))
+         (tvars (hare:tvars def))
+         (argtys (hare:adt-args adt))
+         (map (hare::make-tysubst (mapcar #'cons tvars argtys)))
+         (tag (position constructor (hare:constructors def))))
+    (setf str (llvm:build-insert-value *builder* str (llvm:const-int
+                                                      (llvm:int64-type)
+                                                      tag) 0 "tag"))
+    (loop with i = 1
+          for arg in args
+          for field in (hare::fields constructor)
+          for type = (hare::subst-type map field)
+          do (loop for word in (wordify type arg)
+                   do (setf str
+                            (llvm:build-insert-value *builder* str word i ""))
+                      (incf i)))
+    str))
+
 (defmethod translate-ast ((ast construct) env)
-  (let* ((ty (type->llvm (hare::type ast)))
+  (let* ((type (hare::type ast))
+         (layout (layout type))
          (args (loop for arg in (args ast)
                      for value = (translate-ast arg env)
                      when (null value)
                        do (return-from translate-ast nil)
-                     else collect value))
-         (str (llvm:undef ty)))
-    (loop for arg in args
-          for i from 0
-          do (setf str
-                   (llvm:build-insert-value *builder* str arg i "")))
-    str))
+                     else collect value)))
+    (apply #'construct layout type (hare::constructor ast) args)))
 
 (defmethod translate-ast ((ast literal) env)
   (declare (ignore env))

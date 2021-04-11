@@ -37,37 +37,91 @@
 (defmethod type->llvm ((type arrayt))
   (type->llvm (arrayt-element-type type)))
 
-(defun constructor->llvm (constructor map)
-  (let ((struct (llvm:struct-create-named
-                 ;; TODO: Put the parameter types in the name.
-                 (string-downcase (symbol-name (hare:name constructor))))))
+;;; Sum types (ADTs with more than one constructor) are tricky to describe in
+;;; LLVM, because it has no direct representation of them, and more annoyingly,
+;;; does not permit bitcasting aggregate (structure) types.
+;;; For an ADT in memory we can skip this by having structures consisting of a
+;;; tag and an indefinitely sized array of i8, but for structures we can
+;;; directly deal with (i.e. not through pointers) this is not possible, as
+;;; arrays are not first class. What we need to do is come up with a kind of
+;;; least common denominator that can work for any of the constructors.
+;;; As a KLUDGEy first approximation, we can do an i64 for each field, and cast
+;;; these i64s wildly.
+
+;;; A "layout" represents how an object is actually laid out in memory.
+;;; In the future the ability to specify the layout of objects will be somewhat
+;;; exported to the user (e.g. to specify ABIs, deal with hardware, optimize)
+;;; but for now it's internal.
+(defclass layout ()
+  (;; An LLVM type
+   (%ltype :initarg :ltype :reader ltype)))
+
+(defclass adt-layout (layout) ())
+
+;;; A "direct" translation as an LLVM struct.
+(defclass direct-layout (adt-layout) ())
+
+(defun compute-direct-layout (adt)
+  (let* ((def (hare:adt-def adt))
+         (constructor (first (hare::constructors def)))
+         (tvars (hare:tvars def)) (args (hare:adt-args adt))
+         (map (hare::make-tysubst (mapcar #'cons tvars args)))
+         (struct (llvm:struct-create-named
+                  ;; TODO: Put the parameter types in the name.
+                  (string-downcase (symbol-name (hare:name constructor))))))
     (llvm:struct-set-body struct
                           (loop for field in (hare::fields constructor)
                                 collect (type->llvm
                                          (hare::subst-type map field))))
-    struct))
+    (make-instance 'direct-layout :ltype struct)))
 
-;; We want multiple type->llvm calls on the same struct type to return the same
-;; LLVM type.
+;;; A dumb translation as a struct of a sequence of i64s.
+(defclass dumb-layout (adt-layout) ())
+
+;;; How many words does this type need to be represented?
+;;; This function is enormously KLUDGEy. It would be more correct to get info
+;;; about sizes from LLVM, but it seems to be rather involved to do so. You
+;;; want to use the DataLayout class, except that it does not seem to be very
+;;; well exposed to the C API.
+(defgeneric nwords (type))
+(defmethod nwords ((ty hare:int))
+  (if (> (hare:int-type-length ty) 64)
+      (error "BUG: Not implemented yet")
+      1))
+(defmethod nwords ((ty hare:pointer)) 1)
+
+(defmethod nwords ((ty hare:adt))
+  (1+ ; tag
+   (loop with def = (hare:adt-def ty)
+         with tvars = (hare:tvars def)
+         with args = (hare:adt-args ty)
+         with map = (hare::make-tysubst (mapcar #'cons tvars args))
+         for constructor in (hare::constructors def)
+         maximize (loop for field in (hare::fields constructor)
+                        for rfield = (hare::subst-type map field)
+                        sum (nwords rfield)))))
+
+(defun compute-dumb-layout (adt)
+  (let* ((def (hare:adt-def adt))
+         (name (string-downcase (symbol-name (hare:name def))))
+         (struct (llvm:struct-create-named name))
+         (nwords (nwords adt)))
+    (llvm:struct-set-body struct
+                          (loop repeat nwords collect (llvm:int64-type)))
+    (make-instance 'dumb-layout :ltype struct)))
+
+(defun direct-layout-adt-p (adt)
+  (= (length (hare:constructors (hare:adt-def adt))) 1))
+
+(defun compute-layout (adt)
+  (if (direct-layout-adt-p adt)
+      (compute-direct-layout adt)
+      (compute-dumb-layout adt)))
+
 (defvar *types*)
 
-(defmethod type->llvm :around ((type adt))
-  (or (values (gethash type *types*))
-      (setf (gethash type *types*) (call-next-method))))
+(defun layout (adt)
+  (or (values (gethash adt *types*))
+      (setf (gethash adt *types*) (compute-layout adt))))
 
-(defmethod type->llvm ((type adt))
-  (let* ((def (adt-def type))
-         (args (adt-args type))
-         (tvars (tvars def))
-         (map (hare::make-tysubst (mapcar #'cons tvars args)))
-         (structs
-           (loop for constructor in (constructors def)
-                 collect (constructor->llvm constructor map)))
-         (nstructs (length structs)))
-    (case nstructs
-      (0 (let ((st (llvm:struct-create-named "")))
-           (llvm:struct-set-body st nil)
-           st))
-      (1 (first structs))
-      (otherwise
-       (error "unions are hard :(")))))
+(defmethod type->llvm ((type adt)) (ltype (layout type)))
