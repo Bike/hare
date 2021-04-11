@@ -178,7 +178,7 @@ Forces the pointer to point to the particular constructor type, as expected.
 (defmethod mapnil-ast (function (ast case))
   (mapnil-ast function (value ast))
   (loop for clause in (clauses ast)
-        do (mapnil-ast function clause)))
+        do (mapnil-ast function (body clause))))
 (defmethod map-ast (function (ast case))
   (make-instance 'case
     :value (map-ast function (value ast))

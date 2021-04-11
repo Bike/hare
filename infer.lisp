@@ -378,7 +378,8 @@
                    for new-tenv = (extend-tenv-list variables fieldscs tenv)
                    for prei = (infer (body clause) new-tenv)
                    collect (inference-sans prei variables)))
-           (csubst (apply #'unify (mapcar #'type clauses))))
+           (bodies (mapcar #'body clauses))
+           (csubst (apply #'unify (mapcar #'type bodies))))
       (setf (type ast) (type (body (first clauses))))
       (subst-inference
        vsubst
