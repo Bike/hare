@@ -388,12 +388,10 @@
 
 (defmethod infer ((ast construct) tenv)
   (let* ((constructor (constructor ast))
-         (def (adt-def constructor))
          (args (args ast))
          (iargs (loop for arg in args collect (infer arg tenv))))
-    (multiple-value-bind (adt conslist) (instantiate-adt-def def)
-      (let* ((cs (cdr (assoc constructor conslist)))
-             (s (unify-pairwise cs (mapcar #'type args))))
+    (multiple-value-bind (adt consfields) (instantiate-constructor constructor)
+      (let ((s (unify-pairwise consfields (mapcar #'type args))))
         (setf (type ast) (subst-type s adt))
         (subst-inference s (compose-inferences iargs))))))
 

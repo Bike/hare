@@ -154,35 +154,28 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 (defmethod wordify ((type hare:adt) value)
   (if (direct-layout-adt-p type)
       (list* (llvm:const-int (llvm:int64-type) 0) ; tag
-             (let* ((def (hare:adt-def type))
-                    (tvars (hare:tvars def))
-                    (args (hare:adt-args type))
-                    (map (hare::make-tysubst (mapcar #'cons tvars args)))
-                    (constructor
-                     (first (hare:constructors (hare:adt-def type)))))
-               (loop for field in (hare::fields constructor)
-                     for rfield = (hare::subst-type map field)
-                     for i from 0
-                     for stref = (llvm:build-extract-value
-                                  *builder* value i "")
-                     appending (wordify rfield stref))))
+             (loop with constructor = (first (hare:constructors type))
+                   for field in (hare::fields constructor)
+                   for i from 0
+                   for stref = (llvm:build-extract-value
+                                *builder* value i "")
+                   appending (wordify field stref)))
       (loop for i from 0 below (nwords type)
             collecting (llvm:build-extract-value *builder* value i ""))))
 (defmethod construct ((layout dumb-layout) adt constructor &rest args)
   (let* ((str (llvm:undef (ltype layout)))
-         (def (hare:adt-def constructor))
-         (tvars (hare:tvars def))
-         (argtys (hare:adt-args adt))
-         (map (hare::make-tysubst (mapcar #'cons tvars argtys)))
-         (tag (position constructor (hare:constructors def))))
+         (fconstructors (hare:constructors adt))
+         (rconstructor (find (hare:name constructor) fconstructors
+                             :key #'hare:name))
+         (tag (position rconstructor fconstructors)))
+    (assert (not (null tag)))
     (setf str (llvm:build-insert-value *builder* str (llvm:const-int
                                                       (llvm:int64-type)
                                                       tag) 0 "tag"))
     (loop with i = 1
           for arg in args
-          for field in (hare::fields constructor)
-          for type = (hare::subst-type map field)
-          do (loop for word in (wordify type arg)
+          for field in (hare::fields rconstructor)
+          do (loop for word in (wordify field arg)
                    do (setf str
                             (llvm:build-insert-value *builder* str word i ""))
                       (incf i)))

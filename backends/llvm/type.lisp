@@ -62,17 +62,12 @@
 (defclass direct-layout (adt-layout) ())
 
 (defun compute-direct-layout (adt)
-  (let* ((def (hare:adt-def adt))
-         (constructor (first (hare::constructors def)))
-         (tvars (hare:tvars def)) (args (hare:adt-args adt))
-         (map (hare::make-tysubst (mapcar #'cons tvars args)))
+  (let* ((constructor (first (hare::constructors adt)))
          (struct (llvm:struct-create-named
                   ;; TODO: Put the parameter types in the name.
                   (string-downcase (symbol-name (hare:name constructor))))))
     (llvm:struct-set-body struct
-                          (loop for field in (hare::fields constructor)
-                                collect (type->llvm
-                                         (hare::subst-type map field))))
+                          (mapcar #'type->llvm (hare::fields constructor)))
     (make-instance 'direct-layout :ltype struct)))
 
 ;;; A dumb translation as a struct of a sequence of i64s.
@@ -92,14 +87,9 @@
 
 (defmethod nwords ((ty hare:adt))
   (1+ ; tag
-   (loop with def = (hare:adt-def ty)
-         with tvars = (hare:tvars def)
-         with args = (hare:adt-args ty)
-         with map = (hare::make-tysubst (mapcar #'cons tvars args))
-         for constructor in (hare::constructors def)
+   (loop for constructor in (hare::constructors ty)
          maximize (loop for field in (hare::fields constructor)
-                        for rfield = (hare::subst-type map field)
-                        sum (nwords rfield)))))
+                        sum (nwords field)))))
 
 (defun compute-dumb-layout (adt)
   (let* ((def (hare:adt-def adt))

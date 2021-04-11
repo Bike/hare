@@ -205,45 +205,4 @@ constants are integers with the given n's.
                type)
   t)
 
-;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; ADT stuff
-;;;
-
-;;; Definition of a particular constructor in an ADT. Not a type.
-(defclass constructor ()
-  ((%name :initarg :name :reader name :type symbol)
-   (%adt-def :initarg :adt-def :reader adt-def :type adt-def)
-   ;; A proper list of TYPEs
-   (%fields :initarg :fields :accessor fields :type list)))
-
-;;; Definition of an ADT schema thing, as from defadt. Not a type.
-(defclass adt-def ()
-  ((%name :initarg :name :accessor name :type symbol)
-   ;; A proper list of bound type variables (TVARs)
-   (%tvars :initarg :tvars :accessor tvars :type list)
-   ;; A proper list of CONSTRUCTORs
-   (%constructors :initarg :constructors :accessor constructors :type list)))
-
-(defun arity (adt-def) (length (tvars adt-def)))
-
-;;; E.g., if we have (defadt foo (x) ...), and then refer to (foo (int 3))
-;;; somewhere, we have one of these, with args = ((int 3)) but it's a type.
-;;; In type theory this is more often called TApp or the like.
-(defclass adt (type)
-  (;; Which ADT definition this is an instantiation of.
-   (%def :initarg :def :accessor adt-def :type adt-def)
-   ;; A list of types.
-   (%args :initarg :args :accessor adt-args :type list)))
-(defun make-adt (def args)
-  (let ((key (list* def args)))
-    (or (cached-adt key)
-        (setf (cached-adt key) (make-instance 'adt :def def :args args)))))
-(defmethod map-type (function (type adt))
-  (make-adt (adt-def type)
-            (loop for ty in (adt-args type)
-                  collect (map-type function ty))))
-(defmethod mapnil-type (function (type adt))
-  (loop for ty in (adt-args type) do (map-type function ty)))
-(defmethod unparse-type ((type adt))
-  `(,(name (adt-def type)) ,@(mapcar #'unparse-type (adt-args type))))
+;;; For algebraic data types, see adt.lisp. They're a little more complicated.
