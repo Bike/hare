@@ -115,14 +115,11 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 (e.g. if there is an escape)."))
 
 (defmethod translate-ast ((ast ast:seq) env)
-  (let ((asts (ast:asts ast)))
-    (if (null asts)
-        (error "TODO :(")
-        (loop with result = nil
-              for ast in asts
-              do (setf result (translate-ast ast env))
-              when (null result) return nil
-              finally (return result)))))
+  (loop with result = nil
+        for ast in (ast:asts ast)
+        do (translate-ast ast env)
+        when (null result) do (return-from translate-ast nil))
+  (translate-ast (ast:value ast) env))
 
 (defmethod translate-ast ((ast ast:call) env)
   (let* ((callee (translate-ast (ast:callee ast) env))

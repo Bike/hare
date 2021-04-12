@@ -317,12 +317,15 @@
     inference))
 
 (defmethod infer ((ast ast:seq) tenv)
-  ;; FIXME: Unify the discarded values with Unit. (and define Unit.)
-  (let ((ignored (butlast (ast:asts ast)))
-        (final (first (last (ast:asts ast)))))
-    (unless (null ignored) (error "whoops not implemented"))
-    (prog1 (infer final tenv)
-      (setf (ast:type ast) (ast:type final)))))
+  (let* ((ignored (ast:asts ast))
+         (final (ast:value ast))
+         (inert (type:inert))
+         (igninf (loop for ast in ignored collect (infer ast tenv)))
+         (u (apply #'unify inert (mapcar #'ast:type ignored)))
+         (finf (infer final tenv)))
+    (setf (ast:type ast) (ast:type final))
+    (subst-inference u
+                     (compose-inferences (list* finf igninf)))))
 
 (defmethod infer ((ast ast:bind) tenv)
   (let* ((value (ast:value ast))
@@ -377,7 +380,9 @@
          (pu (unify (ast:type pointer) pty))
          (vu (unify (ast:type value) ty)))
     (setf (ast:type ast) (type:inert))
-    (subst-inference pu (subst-inference vu (compose-inferences pinf vinf)))))
+    (subst-inference pu
+                     (subst-inference vu
+                                      (compose-inferences (list pinf vinf))))))
 
 (defmethod infer ((ast ast:case) tenv)
   (multiple-value-bind (tapp cmap) (type:instantiate-adt-def (type:adt-def ast))

@@ -57,12 +57,16 @@ A form is either
   (loop for ast in asts collect (map-ast function ast)))
 
 (defclass seq (ast)
-  (;; A list of ASTs
-   (%asts :accessor asts :initarg :asts :type list)))
+  (;; A list of ASTs evaluated for effect
+   (%asts :accessor asts :initarg :asts :type list)
+   ;; The AST that actually provides the value.
+   (%value :accessor value :initarg :value :type ast)))
 (defmethod mapnil-ast (function (ast seq))
-  (mapnil-asts function (asts ast)))
+  (mapnil-asts function (asts ast))
+  (mapnil-ast function (value ast)))
 (defmethod map-ast (function (ast seq))
-  (make-instance 'seq :asts (map-asts function (asts ast))))
+  (make-instance 'seq :asts (map-asts function (asts ast))
+                 :value (map-ast function (value ast))))
 
 (defclass call (ast)
   ((%callee :accessor callee :initarg :callee :type ast)

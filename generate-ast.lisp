@@ -16,7 +16,9 @@
         collect (convert form env type-env)))
 
 (defun convert-seq (list env type-env)
-  (make-instance 'ast:seq :asts (convertlis list env type-env)))
+  (when (null list) (error "empty seq disallowed"))
+  (let ((cl (convertlis list env type-env)))
+    (make-instance 'ast:seq :asts (butlast cl) :value (first (last cl)))))
 
 (defun convert-symbol (symbol env type-env)
   (let ((info (lookup symbol env)))
@@ -55,7 +57,7 @@
 
 (defmethod convert-special ((operator (eql 'let)) rest env type-env)
   (destructuring-bind ((varname value) &rest body) rest
-    (let* ((lvar (make-variable varname))
+    (let* ((lvar (ast:make-variable varname))
            (info (make-instance 'variable-info :variable lvar))
            (new-env (make-env (list varname) (list info) env)))
       (make-instance 'ast:bind
@@ -91,7 +93,7 @@
 (defun convert-clause (constructor-name varnames bodyforms env type-env)
   (let* ((constructor (find-constructor constructor-name type-env))
          (variables (loop for varname in varnames
-                          collect (make-variable varname)))
+                          collect (ast:make-variable varname)))
          (var-infos (loop for variable in variables
                           collect (make-instance 'variable-info
                                     :variable variable)))
@@ -107,9 +109,10 @@
     (let* ((clauses
              (loop for ((cname . vars) . body) in clauses
                    collect (convert-clause cname vars body env type-env)))
-           (adt-def (adt-def (constructor (first clauses)))))
+           (adt-def (type:adt-def (ast:constructor (first clauses)))))
       (assert (loop for clause in (rest clauses)
-                    always (eq adt-def (adt-def (constructor clause)))))
+                    always (eq adt-def
+                               (type:adt-def (ast:constructor clause)))))
       (make-instance 'ast:case
         :value (convert value env type-env)
         :clauses clauses

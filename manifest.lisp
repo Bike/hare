@@ -48,6 +48,7 @@
 (defmethod manifest-ast ((ast ast:seq) tysubst)
   (make-instance 'ast:seq
     :asts (manifest-ast-list (ast:asts ast) tysubst)
+    :value (manifest-ast (ast:value ast) tysubst)
     :type (type:subst-type tysubst (ast:type ast))))
 
 (defmethod manifest-ast ((ast ast:call) tysubst)
