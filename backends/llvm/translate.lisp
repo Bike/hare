@@ -296,14 +296,16 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 
 ;;; TODO: pointer-load and pointer-store will be much more involved when they're
 ;;; layout dependent; essentially doing some semiarbitrary mapping
-(defmethod translate-ast ((ast ast:pointer-load) env)
-  (llvm:build-load *builder* (translate-ast (ast:pointer ast) env) ""))
-(defmethod translate-ast ((ast ast:pointer-store) env)
-  (llvm:build-store *builder*
-                    (translate-ast (ast:value ast) env)
-                    (translate-ast (ast:pointer ast) env))
-  ;; FIXME: actually return inert
-  :fixme)
+(defmethod translate-ast ((ast ast:primitive) env)
+  (ecase (ast:name ast)
+    ((hare::!)
+     (llvm:build-load *builder* (translate-ast (first (ast:args ast)) env) ""))
+    ((hare::set!)
+     (llvm:build-store *builder*
+                       (translate-ast (second (ast:args ast)) env)
+                       (translate-ast (first (ast:args ast)) env))
+     ;; FIXME: actually return inert
+     :fixme)))
 
 (defmethod translate-ast ((ast ast:with) env)
   (let ((nbytes (ast:nbytes ast)))

@@ -90,19 +90,12 @@
 (defmethod manifest-ast ((ast ast:construct) tysubst)
   (make-instance 'ast:construct
     :constructor (ast:constructor ast)
-    :args (loop for arg in (ast:args ast)
-                collect (manifest-ast arg tysubst))
+    :args (manifest-ast-list (ast:args ast) tysubst)
     :type (type:subst-type tysubst (ast:type ast))))
 
-(defmethod manifest-ast ((ast ast:pointer-load) tysubst)
-  (make-instance 'ast:pointer-load
-    :pointer (manifest-ast (ast:pointer ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:pointer-store) tysubst)
-  (make-instance 'ast:pointer-store
-    :pointer (manifest-ast (ast:pointer ast) tysubst)
-    :value (manifest-ast (ast:value ast) tysubst)
+(defmethod manifest-ast ((ast ast:primitive) tysubst)
+  (make-instance 'ast:primitive
+    :name (ast:name ast) :args (manifest-ast-list (ast:args ast) tysubst)
     :type (type:subst-type tysubst (ast:type ast))))
 
 (defmethod manifest-ast ((ast ast:with) tysubst)

@@ -150,24 +150,16 @@ A form is either
     :nbytes (map-ast function (nbytes ast))
     :body (map-ast function (body ast))))
 
-;; internal special operator for ! function
-(defclass pointer-load (ast)
-  ((%pointer :initarg :pointer :accessor pointer :type ast)))
-(defmethod mapnil-ast (function (ast pointer-load))
-  (mapnil-ast function (pointer ast)))
-(defmethod map-ast (function (ast pointer-load))
-  (make-instance 'pointer-load :pointer (map-ast function (pointer ast))))
-
-;; internal special operator for set! function
-(defclass pointer-store (ast)
-  ((%pointer :initarg :pointer :accessor pointer :type ast)
-   (%value :initarg :value :accessor value :type ast)))
-(defmethod mapnil-ast (function (ast pointer-store))
-  (mapnil-ast function (pointer ast))
-  (mapnil-ast function (value ast)))
-(defmethod map-ast (function (ast pointer-store))
-  (make-instance 'pointer-store :pointer (map-ast function (pointer ast))
-                 :value (map-ast function (value ast))))
+;; For things with function syntax that the compiler handles specially
+(defclass primitive (ast)
+  ((%name :initarg :name :reader name :type symbol)
+   ;; list of ASTs
+   (%args :initarg :args :reader args :type list)))
+(defmethod mapnil-ast (function (ast primitive))
+  (mapnil-asts function (args ast)))
+(defmethod map-ast (function (ast primitive))
+  (make-instance 'primitive
+    :name (name ast) :args (map-asts function (args ast))))
 
 (defclass case-clause ()
   ((%constructor :initarg :constructor :accessor constructor

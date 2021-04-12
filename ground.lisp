@@ -6,9 +6,9 @@
 ;;; won't involve them.
 
 (defun make-ground-env ()
-  (make-env '(let seq case case! with cons ! set!)
+  (make-env '(let seq case case! with cons primitive)
             (mapcar #'make-instance
-                    (make-list 8 :initial-element 'special-operator-info))))
+                    (make-list 7 :initial-element 'special-operator-info))))
 
 (defparameter *ground* (make-ground-env))
 

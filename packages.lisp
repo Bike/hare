@@ -39,7 +39,7 @@
            #:reference #:name
            #:bind
            #:with #:nbytes
-           #:pointer-load #:pointer-store #:pointer
+           #:primitive
            #:case #:adt-def #:clauses #:case!p
            #:case-clause #:variables
            #:construct))

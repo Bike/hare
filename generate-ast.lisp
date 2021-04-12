@@ -114,13 +114,10 @@
     :constructor (find-constructor (first args) type-env)
     :args (convertlis (rest args) env type-env)))
 
-(defmethod convert-special ((operator (eql '!)) args env type-env)
-  (destructuring-bind (p) args
-    (make-instance 'ast:pointer-load :pointer (convert p env type-env))))
-(defmethod convert-special ((operator (eql 'set!)) args env type-env)
-  (destructuring-bind (p v) args
-    (make-instance 'ast:pointer-store
-      :pointer (convert p env type-env) :value (convert v env type-env))))
+(defmethod convert-special ((operator (eql 'primitive)) args env type-env)
+  (destructuring-bind (name &rest args) args
+    (make-instance 'ast:primitive
+      :name name :args (convertlis args env type-env))))
 
 (defmethod convert-special ((operator (eql 'quote)) args env type-env)
   (destructuring-bind (spec) args
