@@ -144,6 +144,25 @@ A form is either
     :initialization (map-ast function (initialization ast))
     :body (map-ast function (body ast))))
 
+;; internal special operator for ! function
+(defclass pointer-load (ast)
+  ((%pointer :initarg :pointer :accessor pointer :type ast)))
+(defmethod mapnil-ast (function (ast pointer-load))
+  (mapnil-ast function (pointer ast)))
+(defmethod map-ast (function (ast pointer-load))
+  (make-instance 'pointer-load :pointer (map-ast function (pointer ast))))
+
+;; internal special operator for set! function
+(defclass pointer-store (ast)
+  ((%pointer :initarg :pointer :accessor pointer :type ast)
+   (%value :initarg :value :accessor value :type ast)))
+(defmethod mapnil-ast (function (ast pointer-store))
+  (mapnil-ast function (pointer ast))
+  (mapnil-ast function (value ast)))
+(defmethod map-ast (function (ast pointer-store))
+  (make-instance 'pointer-store :pointer (map-ast function (pointer ast))
+                 :value (map-ast function (value ast))))
+
 (defclass case-clause ()
   ((%constructor :initarg :constructor :accessor constructor
                  :type type:constructor)

@@ -9,7 +9,7 @@
            #:arrayt #:arrayt-element-type #:make-arrayt
            #:adt-def #:name #:tvars #:constructors #:members #:arity
            #:tvar #:name #:make-tvar
-           #:adt #:adt-args #:constructor #:fields #:make-adt)
+           #:adt #:adt-args #:constructor #:fields #:make-adt #:inert)
   (:export #:mapnil-type #:map-type)
   (:export #:schema #:free #:free-in-schema #:instantiate)
   (:export #:tysubst #:empty-tysubst #:make-tysubst #:subst-type
@@ -38,6 +38,7 @@
            #:literal #:initializer
            #:reference #:name
            #:bind
+           #:pointer-load #:pointer-store #:pointer
            #:case #:adt-def #:clauses #:case!p
            #:case-clause #:variables
            #:construct))

@@ -43,6 +43,21 @@
 
 ;;;
 
+;;; INERT is a slightly magical ADT.
+;;; It could be defined by (defadt inert () (inert)), but we use it within the
+;;; compiler, so it's made/stored ahead of time.
+(defvar *inert-def*
+  (let ((def (make-instance 'adt-def
+               :name 'inert :tvars nil)))
+    (setf (constructors def) (list (make-instance 'constructor
+                                     :name 'inert :adt-def def
+                                     :fields ())))
+    def))
+
+(defun inert () (make-adt *inert-def* nil))
+
+;;;
+
 ;;; This is a bit like instantiating a polytype.
 ;;; Given a constructor, we return an ADT type and a list of fields
 ;;; for that constructor. All of these have fresh type variables substituted

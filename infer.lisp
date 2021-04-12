@@ -361,6 +361,24 @@
     (infer (body ast) new-env)))
 |#
 
+(defmethod infer ((ast ast:pointer-load) tenv)
+  (let* ((pointer (ast:pointer ast))
+         (pinf (infer pointer tenv))
+         (ty (type:make-tvar))
+         (pty (type:make-pointer ty))
+         (u (unify (ast:type pointer) pty)))
+    (setf (ast:type ast) ty)
+    (subst-inference u pinf)))
+
+(defmethod infer ((ast ast:pointer-store) tenv)
+  (let* ((pointer (ast:pointer ast)) (value (ast:value ast))
+         (pinf (infer pointer tenv)) (vinf (infer value tenv))
+         (ty (type:make-tvar)) (pty (type:make-pointer ty))
+         (pu (unify (ast:type pointer) pty))
+         (vu (unify (ast:type value) ty)))
+    (setf (ast:type ast) (type:inert))
+    (subst-inference pu (subst-inference vu (compose-inferences pinf vinf)))))
+
 (defmethod infer ((ast ast:case) tenv)
   (multiple-value-bind (tapp cmap) (type:instantiate-adt-def (type:adt-def ast))
     (let* ((!p (ast:case!p ast))
