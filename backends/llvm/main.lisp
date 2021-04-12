@@ -1,25 +1,13 @@
 (in-package #:hare-llvm)
 
-(defun process-particulars (particulars env tyenv)
-  (loop for (name tyexpr c-name) in particulars
-        for var = (hare:variable (hare::lookup name env))
-        for ty = (hare::parse-type tyexpr tyenv)
-        collect (if c-name (list var ty c-name) (list var ty))))
+(defclass llvm (hare:backend) ())
 
-(defun single-module (exprs particulars &optional (to-file "/tmp/test.bc"))
-  (declare (optimize debug))
-  (type:with-type-cache ()
-    (let* ((*types* (make-hash-table :test #'eq))
-           (prem (hare::parse-pre-module exprs))
-           (env (hare::environment prem))
-           (tyenv (hare::type-env prem))
-           (mod (hare::module prem))
-           (particulars (process-particulars particulars env tyenv))
-           (manifest (hare::manifest mod particulars)))
-      (with-module ("test")
-        (translate manifest)
-        (llvm:verify-module *module*)
-        (llvm:write-bitcode-to-file *module* to-file)))))
+(defmethod hare:dump ((manifest hare:manifest) (backend llvm)
+                      &key (to-file "/tmp/test.bc"))
+  (with-module ("test")
+    (translate manifest)
+    (llvm:verify-module *module*)
+    (llvm:write-bitcode-to-file *module* to-file)))
 
 #| ;; e.g.
 (single-module '((defvar main (lambda (argc argv) (puts hello)))

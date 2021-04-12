@@ -27,4 +27,6 @@
                                               "ast" "packages"))
    (:file "infer" :depends-on ("type" "ast" "packages"))
    (:file "module" :depends-on ("parse-type" "infer" "ast" "env" "packages"))
-   (:file "manifest" :depends-on ("module" "infer" "packages"))))
+   (:file "manifest" :depends-on ("module" "infer" "packages"))
+   (:file "translate" :depends-on ("env" "parse-type" "module" "phase0parse"
+                                         "manifest" "packages"))))

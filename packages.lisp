@@ -47,5 +47,6 @@
   (:use #:cl)
   (:local-nicknames (#:ast #:hare.ast) (#:type #:hare.type))
   (:shadow #:type #:variable)
+  (:export #:manifest #:backend #:dump)
   (:export #:variable #:initializer #:name)
   (:export #:unify))
