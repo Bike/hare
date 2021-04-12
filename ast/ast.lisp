@@ -19,31 +19,15 @@ A form is either
    * (with (var [initializer]) form*) allocates a value on the stack.
      The variable named symbol is bound to a pointer to a value of
       the inferred type. If this type is unsized, an initializer must
-      be provided so the compiler can determine a size.
+      be provided so the compiler can determine a size and possibly mark
+      constructors within.
      If there is no initializer and the pointer is dereferenced before
       a value is stored in it, the consequences are undefined.
      If the pointer is dereferenced after the with form exits,
       the consequences are undefined.
-   * (with-array (var n) form*) allocates an array of values on
-      the stack. n is an integer-typed form, or an integer literal.
-     The type of the variable must be inferred to be an unsized type,
-      and more specifically, either an array or an unsized ADT.
-     In the latter case n is used recursively with that member.
-     NOTE: Not implemented yet.
    * otherwise, a function call. The callee must be a function pointer
       with types matching the arguments.
  * A literal (see literals.lisp)
-
-FIXME: No way to initialize an unsized adt. It can be a union! case! can't do
-shit! Bad bad. Rethink case!, to disambiguate a union it essentially has to
-dereference but the whole point should be that it doesn't.
-But that can't be the point. It doesn't make any sense with having unions.
-A person might want to return a union that's unsized and that's okay.
-Add a new form to force:
- (pointers form (constructor var ...) form*)
-Evaluate form, which must be a (pointer x) where x is the adt constructor is in. vars are bound to the pointers of the slots and forms are evaluated.
-Forces the pointer to point to the particular constructor type, as expected.
-
 |#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
