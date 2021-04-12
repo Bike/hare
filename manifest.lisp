@@ -94,6 +94,17 @@
                 collect (manifest-ast arg tysubst))
     :type (type:subst-type tysubst (ast:type ast))))
 
+(defmethod manifest-ast ((ast ast:pointer-load) tysubst)
+  (make-instance 'ast:pointer-load
+    :pointer (manifest-ast (ast:pointer ast) tysubst)
+    :type (type:subst-type tysubst (ast:type ast))))
+
+(defmethod manifest-ast ((ast ast:pointer-store) tysubst)
+  (make-instance 'ast:pointer-store
+    :pointer (manifest-ast (ast:pointer ast) tysubst)
+    :value (manifest-ast (ast:value ast) tysubst)
+    :type (type:subst-type tysubst (ast:type ast))))
+
 ;;;
 
 (defun check-initializer-typed (initializer)

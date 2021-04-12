@@ -117,8 +117,8 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 (defmethod translate-ast ((ast ast:seq) env)
   (loop with result = nil
         for ast in (ast:asts ast)
-        do (translate-ast ast env)
-        when (null result) do (return-from translate-ast nil))
+        when (null (translate-ast ast env))
+          do (return-from translate-ast nil))
   (translate-ast (ast:value ast) env))
 
 (defmethod translate-ast ((ast ast:call) env)
@@ -293,6 +293,17 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
                      vtype))
          (layout (layout rvtype)))
     (translate-case layout lvalue ast env)))
+
+;;; TODO: pointer-load and pointer-store will be much more involved when they're
+;;; layout dependent; essentially doing some semiarbitrary mapping
+(defmethod translate-ast ((ast ast:pointer-load) env)
+  (llvm:build-load *builder* (translate-ast (ast:pointer ast) env) ""))
+(defmethod translate-ast ((ast ast:pointer-store) env)
+  (llvm:build-store *builder*
+                    (translate-ast (ast:value ast) env)
+                    (translate-ast (ast:pointer ast) env))
+  ;; FIXME: actually return inert
+  :fixme)
 
 (defmethod translate-ast ((ast ast:literal) env)
   (declare (ignore env))

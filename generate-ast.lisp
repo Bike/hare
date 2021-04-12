@@ -82,13 +82,6 @@
                           :initializer initializer)
         :body (convertlis
                body (make-env (list var) (list info) env) type-env)))))
-#+(or)
-(defmethod convert-special ((operator (eql 'with-array)) rest env type-env)
-  (destructuring-bind ((var len) &rest body) rest
-    (let ((lvar (make-variable var)))
-      (make-instance 'with
-        :var (make-variable var) :len (convert len env type-env)
-        :body (convert body (acons var lvar env) type-env)))))
 
 (defun convert-clause (constructor-name varnames bodyforms env type-env)
   (let* ((constructor (find-constructor constructor-name type-env))
@@ -128,6 +121,14 @@
   (make-instance 'ast:construct
     :constructor (find-constructor (first args) type-env)
     :args (convertlis (rest args) env type-env)))
+
+(defmethod convert-special ((operator (eql '!)) args env type-env)
+  (destructuring-bind (p) args
+    (make-instance 'ast:pointer-load :pointer (convert p env type-env))))
+(defmethod convert-special ((operator (eql 'set!)) args env type-env)
+  (destructuring-bind (p v) args
+    (make-instance 'ast:pointer-store
+      :pointer (convert p env type-env) :value (convert v env type-env))))
 
 (defmethod convert-special ((operator (eql 'quote)) args env type-env)
   (destructuring-bind (spec) args
