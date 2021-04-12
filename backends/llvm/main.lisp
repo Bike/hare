@@ -8,7 +8,7 @@
 
 (defun single-module (exprs particulars &optional (to-file "/tmp/test.bc"))
   (declare (optimize debug))
-  (hare:with-type-cache ()
+  (type:with-type-cache ()
     (let* ((*types* (make-hash-table :test #'eq))
            (prem (hare::parse-pre-module exprs))
            (env (hare::environment prem))

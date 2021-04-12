@@ -1,4 +1,4 @@
-(in-package #:hare)
+(in-package #:hare.type)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;

@@ -28,13 +28,13 @@
 
 (defgeneric declare-variable (type &key name initializer))
 
-(defmethod declare-variable ((type hare:fun) &key (name "") initializer)
+(defmethod declare-variable ((type type:fun) &key (name "") initializer)
   (declare (ignore initializer))
   (let ((type (translate-type type)))
     (llvm:add-function *module* name type)))
 
-(defmethod declare-variable ((type hare:arrayt) &key (name "") initializer)
-  (let* ((etype (translate-type (hare:arrayt-element-type type)))
+(defmethod declare-variable ((type type:arrayt) &key (name "") initializer)
+  (let* ((etype (translate-type (type:arrayt-element-type type)))
          (len (if initializer (length (ast:elements initializer)) 0))
          (etype* (llvm:array-type etype len))
          (glob (llvm:add-global *module* etype* name)))
@@ -99,7 +99,7 @@
 
 (defmethod translate-initializer ((init ast:array-initializer)
                                   var global-env)
-  (let* ((etype (type->llvm (hare:arrayt-element-type (ast:type init))))
+  (let* ((etype (type->llvm (type:arrayt-element-type (ast:type init))))
          (const (llvm:const-array etype
                                   ;; KLUDGE?
                                   (mapcar #'translate-literal
@@ -147,17 +147,17 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
           do (setf str (llvm:build-insert-value *builder* str arg i "")))
     str))
 (defgeneric wordify (type value))
-(defmethod wordify ((type hare:int) value)
-  (list (if (< (hare:int-type-length type) 64)
+(defmethod wordify ((type type:int) value)
+  (list (if (< (type:int-type-length type) 64)
             (llvm:build-z-ext *builder* value (llvm:int64-type) "")
             value)))
-(defmethod wordify ((type hare:pointer) value)
+(defmethod wordify ((type type:pointer) value)
   (list (llvm:build-pointer-to-int *builder* value (llvm:int64-type) "")))
-(defmethod wordify ((type hare:adt) value)
+(defmethod wordify ((type type:adt) value)
   (if (direct-layout-adt-p type)
       (list* (llvm:const-int (llvm:int64-type) 0) ; tag
-             (loop with constructor = (first (hare:constructors type))
-                   for field in (hare::fields constructor)
+             (loop with constructor = (first (type:constructors type))
+                   for field in (type:fields constructor)
                    for i from 0
                    for stref = (llvm:build-extract-value
                                 *builder* value i "")
@@ -166,9 +166,9 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
             collecting (llvm:build-extract-value *builder* value i ""))))
 (defmethod construct ((layout dumb-layout) adt constructor &rest args)
   (let* ((str (llvm:undef (ltype layout)))
-         (fconstructors (hare:constructors adt))
-         (rconstructor (find (hare:name constructor) fconstructors
-                             :key #'hare:name))
+         (fconstructors (type:constructors adt))
+         (rconstructor (find (type:name constructor) fconstructors
+                             :key #'type:name))
          (tag (position rconstructor fconstructors)))
     (assert (not (null tag)))
     (setf str (llvm:build-insert-value *builder* str (llvm:const-int
@@ -176,7 +176,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
                                                       tag) 0 "tag"))
     (loop with i = 1
           for arg in args
-          for field in (hare::fields rconstructor)
+          for field in (type:fields rconstructor)
           do (loop for word in (wordify field arg)
                    do (setf str
                             (llvm:build-insert-value *builder* str word i ""))
@@ -218,19 +218,19 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 (defun make-block (name) (llvm:append-basic-block *function* name))
 
 (defgeneric dewordify (type words))
-(defmethod dewordify ((type hare:int) words)
-  (if (< (hare:int-type-length type) 64)
+(defmethod dewordify ((type type:int) words)
+  (if (< (type:int-type-length type) 64)
       (llvm:build-trunc *builder* (first words) (type->llvm type) "")
       (first words)))
-(defmethod dewordify ((type hare:pointer) words)
+(defmethod dewordify ((type type:pointer) words)
   (llvm:build-int-to-pointer *builder* (first words) (type->llvm type) ""))
-(defmethod dewordify ((type hare:adt) words)
+(defmethod dewordify ((type type:adt) words)
   (if (direct-layout-adt-p type)
       (let ((st (llvm:undef (type->llvm type)))
             (words (rest words)) ; ignore tag
-            (constructor (first (hare:constructors type))))
+            (constructor (first (type:constructors type))))
         (loop for i from 0
-              for field in (hare::fields constructor)
+              for field in (type:fields constructor)
               for loword = 0 then (+ loword hiword)
               for hiword = (+ loword (nwords field))
               for val = (dewordify field (subseq words loword hiword))
@@ -244,7 +244,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 
 (defun dumb-case-env (env constructor vars words)
   (let ((values
-          (loop for field in (hare::fields constructor)
+          (loop for field in (type:fields constructor)
                 for loword = 0 then (+ loword hiword) ; previous iter's hiword
                 for hiword = (+ loword (nwords field))
                 collect (dewordify field (subseq words loword hiword)))))
@@ -268,7 +268,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
             for vars = (ast:variables clause)
             ;; KLUDGE: we use the constructors from the type so that they are
             ;; fully substituted, rather than from the clauses.
-            for constructor in (hare:constructors type)
+            for constructor in (type:constructors type)
             for bname = (concatenate 'string
                                      "case-"
                                      (string-downcase
@@ -292,7 +292,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
                      (return-from translate-ast nil)))
          (vtype (ast:type value))
          (rvtype (if (ast:case!p ast)
-                     (hare:pointer-type-underlying vtype)
+                     (type:pointer-type-underlying vtype)
                      vtype))
          (layout (layout rvtype)))
     (translate-case layout lvalue ast env)))
@@ -306,8 +306,8 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
     (llvm:build-in-bounds-gep *builder* value (list zero zero) "darr")))
 
 (defun maybe-gepify (value type)
-  (if (and (typep type 'hare::pointer)
-           (typep (hare:pointer-type-underlying type) 'hare::arrayt))
+  (if (and (typep type 'type:pointer)
+           (typep (type:pointer-type-underlying type) 'type:arrayt))
       (gepify value)
       value))
 

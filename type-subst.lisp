@@ -1,4 +1,4 @@
-(in-package #:hare)
+(in-package #:hare.type)
 
 ;; A type substitution, i.e. a mapping from tvars to types.
 (defclass tysubst ()
@@ -63,3 +63,10 @@
         ((null (rest tysubsts)) (first tysubsts))
         (t (make-instance 'tysubst
              :bindings (reduce #'compose-tysubst tysubsts)))))
+
+;; reduce to repeated compose-tysubst calls
+(define-compiler-macro compose-tysubsts (&rest tysubsts)
+  (cond ((null tysubsts) '(empty-tysubsts))
+        ((null (rest tysubsts)) (first tysubsts))
+        (t `(compose-tysubst ,(first tysubsts)
+                             (compose-tysubsts ,@(rest tysubsts))))))

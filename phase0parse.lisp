@@ -133,7 +133,7 @@
 (defun parse-defadt (pre-module expr)
   (destructuring-bind (name tvars &rest fields) (rest expr)
     (let ((def (make-instance 'adt-def
-                 :name name :tvars (mapcar #'make-tvar tvars))))
+                 :name name :tvars (mapcar #'type:make-tvar tvars))))
       (add-adt-def def (type-env pre-module))
       (make-instance 'tldefadt
         :name name :pre-def def
@@ -143,7 +143,7 @@
   (setf (waiting-on-types tl) nil)
   (let* ((name (name tl)) (pre-def (pre-def tl))
          (cnames (cnames tl)) (exprs (exprs tl))
-         (params (tvars pre-def))
+         (params (type:tvars pre-def))
          (type-env (type-env pre-module))
          (internal-type-env
            (augment-type-env type-env
@@ -163,7 +163,7 @@
                  for fields in fieldses
                  collect (make-instance 'constructor
                            :name cname :adt-def pre-def :fields fields))))
-    (setf (constructors pre-def) constructors
+    (setf (type:constructors pre-def) constructors
           (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
     (loop for constructor in constructors
           do (add-adt-constructor constructor type-env))
@@ -175,7 +175,7 @@
   (declare (ignore pre-module))
   (destructuring-bind (name (&rest tvarnames) utype) (rest expr)
     (make-instance 'tldeftype
-      :name name :parameters (mapcar #'make-tvar tvarnames) :expr utype)))
+      :name name :parameters (mapcar #'type:make-tvar tvarnames) :expr utype)))
 
 (defmethod phase0parse ((tl tldeftype) pre-module)
   (setf (waiting-on-types tl) nil)
@@ -272,7 +272,7 @@
                 ((type)
                  (destructuring-bind (tvarnames type &rest names)
                      (rest declamation)
-                   (loop for tvars = (mapcar #'make-tvar tvarnames)
+                   (loop for tvars = (mapcar #'type:make-tvar tvarnames)
                          for name in names
                          collect (make-instance 'declamation-type
                                    :type type :parameters tvars :name name))))
@@ -294,11 +294,11 @@
            (augment-type-env type-env
                              (loop for param in params
                                    collect (list (name param) () param))))
-         (type (handler-case (make-pointer (parse-type type new-type-env))
+         (type (handler-case (type:make-pointer (parse-type type new-type-env))
                  (unknown-adt (e)
                    (push (name e) (waiting-on-types tl))
                    (return-from phase0parse nil)))))
-    (setf (declared-type info) (schema type params)
+    (setf (declared-type info) (type:schema type params)
           (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq)))
   nil)
 

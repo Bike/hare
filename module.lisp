@@ -16,7 +16,7 @@
 
 (defun module (pre-module)
   (assert (null (toplevels pre-module)))
-  (with-type-cache ()
+  (type:with-type-cache ()
     (let* ((varbinds (varbinds pre-module))
            (env (environment pre-module))
            (tmap
@@ -25,9 +25,9 @@
                           (when (typep info 'variable-info)
                             (let ((variable (variable info))
                                   (sc (or (declared-type info)
-                                          (let ((tv (make-tvar name)))
-                                            (schema (make-pointer tv)
-                                                    (list tv))))))
+                                          (let ((tv (type:make-tvar name)))
+                                            (type:schema (type:make-pointer tv)
+                                                         (list tv))))))
                               (push (cons variable sc) r))))
                         env)
                r))

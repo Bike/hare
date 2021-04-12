@@ -53,7 +53,7 @@ Forces the pointer to point to the particular constructor type, as expected.
 
 ;;; abstract
 (defclass ast ()
-  ((%type :accessor type :initarg :type :type hare:type)))
+  ((%type :accessor type :initarg :type :type type:type)))
 
 ;;; Apply function to AST and its component ASTs. Return value undefined.
 (defgeneric mapnil-ast (function ast)
@@ -162,7 +162,7 @@ Forces the pointer to point to the particular constructor type, as expected.
 
 (defclass case-clause ()
   ((%constructor :initarg :constructor :accessor constructor
-                 :type hare:constructor)
+                 :type type:constructor)
    ;; A proper list of VARIABLEs.
    (%variables :initarg :variables :accessor variables :type list)
    (%body :initarg :body :accessor body :type ast)))
@@ -192,7 +192,7 @@ Forces the pointer to point to the particular constructor type, as expected.
 
 (defclass construct (ast)
   ((%constructor :initarg :constructor :accessor constructor
-                 :type hare:constructor)
+                 :type type:constructor)
    ;; a list of ASTs
    (%args :initarg :args :accessor args :type list)))
 (defmethod mapnil-ast (function (ast construct))

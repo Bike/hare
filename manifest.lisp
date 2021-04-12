@@ -5,42 +5,42 @@
 
 (defmethod manifest-initializer ((object ast:integer-initializer) tysubst)
   (make-instance 'ast:integer-initializer :value (ast:value object)
-                 :type (subst-type tysubst (ast:type object))))
+                 :type (type:subst-type tysubst (ast:type object))))
 
 (defmethod manifest-initializer ((object ast:variable-initializer) tysubst)
   (make-instance 'ast:variable-initializer :variable (variable object)
-                 :type (subst-type tysubst (ast:type object))))
+                 :type (type:subst-type tysubst (ast:type object))))
 
 (defun subst-type-list (tysubst list-of-types)
   (loop for type in list-of-types
-        collect (subst-type tysubst type)))
+        collect (type:subst-type tysubst type)))
 
 (defun manifest-constructor (constructor tysubst)
   (make-instance 'constructor
-    :name (name constructor) :adt-def (adt-def constructor)
-    :fields (subst-type-list tysubst (fields constructor))))
+    :name (name constructor) :adt-def (type:adt-def constructor)
+    :fields (subst-type-list tysubst (type:fields constructor))))
 
 (defmethod manifest-initializer ((object ast:constructor-initializer) tysubst)
   (make-instance 'ast:constructor-initializer
     :constructor (manifest-constructor (ast:constructor object) tysubst)
     :fields (loop for field in (ast:fields object)
                   collect (manifest-initializer field tysubst))
-    :type (subst-type tysubst (ast:type object))))
+    :type (type:subst-type tysubst (ast:type object))))
 
 (defmethod manifest-initializer ((object ast:undef-initializer) tysubst)
   (make-instance 'ast:undef-initializer
-    :type (subst-type tysubst (ast:type object))))
+    :type (type:subst-type tysubst (ast:type object))))
 
 (defmethod manifest-initializer ((object ast:lambda-initializer) tysubst)
   (make-instance 'ast:lambda-initializer :params (ast:params object)
                  :body (manifest-ast (ast:body object) tysubst)
-                 :type (subst-type tysubst (ast:type object))))
+                 :type (type:subst-type tysubst (ast:type object))))
 
 (defmethod manifest-initializer ((object ast:array-initializer) tysubst)
   (make-instance 'ast:array-initializer
     :elements (loop for element in (ast:elements object)
                     collect (manifest-initializer element tysubst))
-    :type (subst-type tysubst (ast:type object))))
+    :type (type:subst-type tysubst (ast:type object))))
 
 (defun manifest-ast-list (asts tysubst)
   (loop for ast in asts collect (manifest-ast ast tysubst)))
@@ -48,29 +48,29 @@
 (defmethod manifest-ast ((ast ast:seq) tysubst)
   (make-instance 'ast:seq
     :asts (manifest-ast-list (ast:asts ast) tysubst)
-    :type (subst-type tysubst (ast:type ast))))
+    :type (type:subst-type tysubst (ast:type ast))))
 
 (defmethod manifest-ast ((ast ast:call) tysubst)
   (make-instance 'ast:call
     :callee (manifest-ast (ast:callee ast) tysubst)
     :args (manifest-ast-list (ast:args ast) tysubst)
-    :type (subst-type tysubst (ast:type ast))))
+    :type (type:subst-type tysubst (ast:type ast))))
 
 (defmethod manifest-ast ((ast ast:literal) tysubst)
   (make-instance 'ast:literal
     :initializer (manifest-initializer (ast:initializer ast) tysubst)
-    :type (subst-type tysubst (ast:type ast))))
+    :type (type:subst-type tysubst (ast:type ast))))
 
 (defmethod manifest-ast ((ast ast:reference) tysubst)
   (make-instance 'ast:reference
-    :variable (ast:variable ast) :type (subst-type tysubst (ast:type ast))))
+    :variable (ast:variable ast) :type (type:subst-type tysubst (ast:type ast))))
 
 (defmethod manifest-ast ((ast ast:bind) tysubst)
   (make-instance 'ast:bind
     :variable (ast:variable ast)
     :value (manifest-ast (ast:value ast) tysubst)
     :body (manifest-ast (ast:body ast) tysubst)
-    :type (subst-type tysubst (ast:type ast))))
+    :type (type:subst-type tysubst (ast:type ast))))
 
 (defun manifest-case-clause (clause tysubst)
   (make-instance 'ast:case-clause
@@ -84,19 +84,19 @@
     :clauses (loop for clause in (ast:clauses ast)
                    collect (manifest-case-clause clause tysubst))
     :adt-def (ast:adt-def ast) :case!p (ast:case!p ast)
-    :type (subst-type tysubst (ast:type ast))))
+    :type (type:subst-type tysubst (ast:type ast))))
 
 (defmethod manifest-ast ((ast ast:construct) tysubst)
   (make-instance 'ast:construct
     :constructor (ast:constructor ast)
     :args (loop for arg in (ast:args ast)
                 collect (manifest-ast arg tysubst))
-    :type (subst-type tysubst (ast:type ast))))
+    :type (type:subst-type tysubst (ast:type ast))))
 
 ;;;
 
 (defun check-initializer-typed (initializer)
-  (let ((f (free (ast:type initializer))))
+  (let ((f (type:free (ast:type initializer))))
     (unless (null f)
       (error "Initializer ~a incompletely manifested as type ~a"
              initializer f))))
@@ -114,13 +114,14 @@
 
 ;;; A monotyped variable.
 (defclass monodef (manifestation)
-  ((%initializer :initarg :initializer :reader initializer :type initializer)))
+  ((%initializer :initarg :initializer :reader initializer
+                 :type ast:initializer)))
 
 (defmethod type ((md monodef)) (ast:type (initializer md)))
 
 ;;; A variable that is defined elsewhere, but still has a monotype.
 (defclass extern (manifestation)
-  ((%type :initarg :type :reader type)))
+  ((%type :initarg :type :reader type :type type:type)))
 
 (defclass manifest ()
   ((%monodefs :initarg :monodefs :reader monodefs :type list)
@@ -130,7 +131,7 @@
   (declare (optimize debug))
   (find-if (lambda (manifest)
              (and (eq (variable manifest) variable)
-                  (type= (type manifest) type)))
+                  (type:type= (type manifest) type)))
            monodefs))
 
 (defun mangle-count (n)
@@ -141,23 +142,23 @@
     (concatenate 'string (write-to-string L :base 16) str)))
 
 (defgeneric mangle-type (type))
-(defmethod mangle-type ((type int))
-  (concatenate 'string "i" (mangle-count (int-type-length type))))
-(defmethod mangle-type ((type pointer))
-  (concatenate 'string "p" (mangle-type (pointer-type-underlying type))))
-(defmethod mangle-type ((type fun))
+(defmethod mangle-type ((type type:int))
+  (concatenate 'string "i" (mangle-count (type:int-type-length type))))
+(defmethod mangle-type ((type type:pointer))
+  (concatenate 'string "p" (mangle-type (type:pointer-type-underlying type))))
+(defmethod mangle-type ((type type:fun))
   (apply #'concatenate 'string "f"
-         (mangle-count (length (parameters type)))
-         (mangle-type (fun-return type))
-         (mapcar #'mangle-type (parameters type))))
-(defmethod mangle-type ((type arrayt))
-  (concatenate 'string "a" (mangle-type (arrayt-element-type type))))
-(defmethod mangle-type ((type adt))
-  (let* ((def (adt-def type))
-         (name (name def))
+         (mangle-count (length (type:parameters type)))
+         (mangle-type (type:fun-return type))
+         (mapcar #'mangle-type (type:parameters type))))
+(defmethod mangle-type ((type type:arrayt))
+  (concatenate 'string "a" (mangle-type (type:arrayt-element-type type))))
+(defmethod mangle-type ((type type:adt))
+  (let* ((def (type:adt-def type))
+         (name (type:name def))
          (sname (string-downcase (write-to-string name)))
          (Lname (length sname))
-         (args (adt-args type)))
+         (args (type:adt-args type)))
     (apply #'concatenate 'string "c" ; custom, since A is taken
            (mangle-count Lname)
            sname
@@ -212,7 +213,7 @@
                      ;; here, breaking abstraction
                      (loop for (vvar . vtypes) in svarmap
                            do (loop for vtype1 in vtypes
-                                    for vtype2 = (pointer-type-underlying
+                                    for vtype2 = (type:pointer-type-underlying
                                                   vtype1)
                                     do (push (list vvar vtype2) worklist)))
                      (push new complete))))

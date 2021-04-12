@@ -2,17 +2,17 @@
 
 (defgeneric type->llvm (type))
 
-(defmethod type->llvm ((type hare:int))
-  (llvm:int-type (hare:int-type-length type)))
+(defmethod type->llvm ((type type:int))
+  (llvm:int-type (type:int-type-length type)))
 
-(defmethod type->llvm ((type hare:pointer))
+(defmethod type->llvm ((type type:pointer))
   (llvm:pointer-type
-   (type->llvm (hare:pointer-type-underlying type))))
+   (type->llvm (type:pointer-type-underlying type))))
 
-(defmethod type->llvm ((type hare:fun))
+(defmethod type->llvm ((type type:fun))
   (llvm:function-type
-   (type->llvm (hare:fun-return type))
-   (mapcar #'type->llvm (hare:parameters type))))
+   (type->llvm (type:fun-return type))
+   (mapcar #'type->llvm (type:parameters type))))
 
 ;;; So this is pretty weird, right? Yes. Here's the skivvy. In C, arrays and
 ;;; pointers are closely identified; array expressions are converted into
@@ -34,8 +34,8 @@
 ;;; down to at most a LEA.
 ;;; I don't actually know if LLVM allows pointer to array as a function
 ;;; parameter type. Guess I will find out!
-(defmethod type->llvm ((type hare:arrayt))
-  (type->llvm (hare:arrayt-element-type type)))
+(defmethod type->llvm ((type type:arrayt))
+  (type->llvm (type:arrayt-element-type type)))
 
 ;;; Sum types (ADTs with more than one constructor) are tricky to describe in
 ;;; LLVM, because it has no direct representation of them, and more annoyingly,
@@ -62,12 +62,12 @@
 (defclass direct-layout (adt-layout) ())
 
 (defun compute-direct-layout (adt)
-  (let* ((constructor (first (hare::constructors adt)))
+  (let* ((constructor (first (type:constructors adt)))
          (struct (llvm:struct-create-named
                   ;; TODO: Put the parameter types in the name.
-                  (string-downcase (symbol-name (hare:name constructor))))))
+                  (string-downcase (symbol-name (type:name constructor))))))
     (llvm:struct-set-body struct
-                          (mapcar #'type->llvm (hare::fields constructor)))
+                          (mapcar #'type->llvm (type:fields constructor)))
     (make-instance 'direct-layout :ltype struct)))
 
 ;;; A dumb translation as a struct of a sequence of i64s.
@@ -79,21 +79,21 @@
 ;;; want to use the DataLayout class, except that it does not seem to be very
 ;;; well exposed to the C API.
 (defgeneric nwords (type))
-(defmethod nwords ((ty hare:int))
-  (if (> (hare:int-type-length ty) 64)
+(defmethod nwords ((ty type:int))
+  (if (> (type:int-type-length ty) 64)
       (error "BUG: Not implemented yet")
       1))
-(defmethod nwords ((ty hare:pointer)) 1)
+(defmethod nwords ((ty type:pointer)) 1)
 
-(defmethod nwords ((ty hare:adt))
+(defmethod nwords ((ty type:adt))
   (1+ ; tag
-   (loop for constructor in (hare::constructors ty)
-         maximize (loop for field in (hare::fields constructor)
+   (loop for constructor in (type:constructors ty)
+         maximize (loop for field in (type:fields constructor)
                         sum (nwords field)))))
 
 (defun compute-dumb-layout (adt)
-  (let* ((def (hare:adt-def adt))
-         (name (string-downcase (symbol-name (hare:name def))))
+  (let* ((def (type:adt-def adt))
+         (name (string-downcase (symbol-name (type:name def))))
          (struct (llvm:struct-create-named name))
          (nwords (nwords adt)))
     (llvm:struct-set-body struct
@@ -101,7 +101,7 @@
     (make-instance 'dumb-layout :ltype struct)))
 
 (defun direct-layout-adt-p (adt)
-  (= (length (hare:constructors (hare:adt-def adt))) 1))
+  (= (length (type:constructors (type:adt-def adt))) 1))
 
 (defun compute-layout (adt)
   (if (direct-layout-adt-p adt)
@@ -114,4 +114,4 @@
   (or (values (gethash adt *types*))
       (setf (gethash adt *types*) (compute-layout adt))))
 
-(defmethod type->llvm ((type hare:adt)) (ltype (layout type)))
+(defmethod type->llvm ((type type:adt)) (ltype (layout type)))

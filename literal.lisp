@@ -58,7 +58,7 @@
 
 ;;; abstract
 (defclass initializer ()
-  ((%type :accessor type :initarg :type :type hare:type)))
+  ((%type :accessor type :initarg :type :type type:type)))
 
 (defclass integer-initializer (initializer)
   ((%value :accessor value :initarg :value :type (cl:integer 0))))

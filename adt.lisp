@@ -1,4 +1,4 @@
-(in-package #:hare)
+(in-package #:hare.type)
 
 ;;; Definition of a particular constructor in an ADT. Not a type.
 (defclass constructor ()
