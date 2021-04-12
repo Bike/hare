@@ -301,6 +301,8 @@
 
 (defgeneric infer (ast tenv))
 
+(defun infer-list (asts tenv) (loop for ast in asts collect (infer ast tenv)))
+
 (defmethod infer ((ast ast:reference) tenv)
   (let* ((variable (ast:variable ast))
          (ty (type:instantiate (lookup-type variable tenv))))
@@ -320,7 +322,7 @@
   (let* ((ignored (ast:asts ast))
          (final (ast:value ast))
          (inert (type:inert))
-         (igninf (loop for ast in ignored collect (infer ast tenv)))
+         (igninf (infer-list ignored tenv))
          (u (apply #'unify inert (mapcar #'ast:type ignored)))
          (finf (infer final tenv)))
     (setf (ast:type ast) (ast:type final))
@@ -358,27 +360,26 @@
     (setf (ast:type ast) (ast:type (ast:body ast)))
     (compose-inferences/2 ninf binf)))
 
+(defparameter *primitive-types*
+  (list (cons '! (lambda ()
+                   (let ((ty (type:make-tvar)))
+                     (values ty (list (type:make-pointer ty))))))
+        (cons 'set! (lambda ()
+                      (let ((ty (type:make-tvar)))
+                        (values (type:inert)
+                                (list (type:make-pointer ty) ty)))))))
+
 (defmethod infer ((ast ast:primitive) tenv)
-  (ecase (ast:name ast)
-    ((!)
-     (let* ((pointer (first (ast:args ast)))
-            (pinf (infer pointer tenv))
-            (ty (type:make-tvar))
-            (pty (type:make-pointer ty))
-            (u (unify (ast:type pointer) pty)))
-       (setf (ast:type ast) ty)
-       (subst-inference u pinf)))
-    ((set!)
-     (let* ((pointer (first (ast:args ast))) (value (second (ast:args ast)))
-            (pinf (infer pointer tenv)) (vinf (infer value tenv))
-            (ty (type:make-tvar)) (pty (type:make-pointer ty))
-            (pu (unify (ast:type pointer) pty))
-            (vu (unify (ast:type value) ty)))
-       (setf (ast:type ast) (type:inert))
-       (subst-inference pu
-                        (subst-inference vu
-                                         (compose-inferences
-                                          (list pinf vinf))))))))
+  ;; basically a slightly dumber version of call ASTs.
+  (let* ((name (ast:name ast)) (args (ast:args ast))
+         (pair (assoc name *primitive-types*))
+         (thunk (or (cdr pair) (error "Unknown primitive ~a" name))))
+    (multiple-value-bind (rett argts) (funcall thunk)
+      (let* ((iargs (infer-list args tenv))
+             (au (unify-pairwise argts (mapcar #'ast:type args)))
+             (rett (type:subst-type au rett)))
+        (setf (ast:type ast) rett)
+        (subst-inference au (compose-inferences iargs))))))
 
 (defmethod infer ((ast ast:case) tenv)
   (multiple-value-bind (tapp cmap) (type:instantiate-adt-def (type:adt-def ast))
@@ -413,7 +414,7 @@
 (defmethod infer ((ast ast:construct) tenv)
   (let* ((constructor (ast:constructor ast))
          (args (ast:args ast))
-         (iargs (loop for arg in args collect (infer arg tenv))))
+         (iargs (infer-list args tenv)))
     (multiple-value-bind (adt consfields)
         (type:instantiate-constructor constructor)
       (let ((s (unify-pairwise consfields (mapcar #'ast:type args))))
@@ -422,7 +423,7 @@
 
 (defmethod infer ((ast ast:call) tenv)
   (let* ((args (ast:args ast))
-         (iargs (loop for arg in args collect (infer arg tenv)))
+         (iargs (infer-list args tenv))
          (callee (ast:callee ast))
          (icallee (infer callee tenv))
          (retname (if (typep callee 'ast:reference)
