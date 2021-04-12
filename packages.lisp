@@ -38,6 +38,7 @@
            #:literal #:initializer
            #:reference #:name
            #:bind
+           #:with #:nbytes
            #:pointer-load #:pointer-store #:pointer
            #:case #:adt-def #:clauses #:case!p
            #:case-clause #:variables

@@ -105,6 +105,13 @@
     :value (manifest-ast (ast:value ast) tysubst)
     :type (type:subst-type tysubst (ast:type ast))))
 
+(defmethod manifest-ast ((ast ast:with) tysubst)
+  (make-instance 'ast:with
+    :variable (ast:variable ast)
+    :nbytes (manifest-ast (ast:nbytes ast) tysubst)
+    :body (manifest-ast (ast:body ast) tysubst)
+    :type (type:subst-type tysubst (ast:type ast))))
+
 ;;;
 
 (defun check-initializer-typed (initializer)

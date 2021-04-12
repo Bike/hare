@@ -346,23 +346,17 @@
 #|
 (defmethod infer ((ast initialization) tenv)
   (values (initializer-type (initializer ast) tenv) (empty-subst)))
-
-(defmethod infer ((ast with) tenv)
-  ;; Basically like BIND/LET, except we use the initializer's type.
-  (let* (;; We ignore the returned subst because we know it's empty:
-         ;; the initialization is an initialization, and check the
-         ;; infer method above
-         (type (infer (initialization ast) tenv))
-         ;; This'll force unification with (pointer tvar) as we want.
-         ;; (I mean, assuming the body uses the thing.)
-         (tptr (make-pointer tvar))
-         #+polymorphic-local
-         (sc (generalize tenv tptr))
-         #-polymorphic-local
-         (sc (schema tptr))
-         (new-env (extend-tenv (variable ast) sc env)))
-    (infer (body ast) new-env)))
 |#
+
+(defmethod infer ((ast ast:with) tenv)
+  (let* ((ninf (infer (ast:nbytes ast) tenv))
+         (var (ast:variable ast))
+         (ty (type:make-tvar (symbol-name (ast:name var))))
+         (pty (type:make-pointer ty))
+         (nenv (extend-tenv var (type:schema pty) tenv))
+         (binf (infer (ast:body ast) nenv)))
+    (setf (ast:type ast) (ast:type (ast:body ast)))
+    (compose-inferences/2 ninf binf)))
 
 (defmethod infer ((ast ast:pointer-load) tenv)
   (let* ((pointer (ast:pointer ast))

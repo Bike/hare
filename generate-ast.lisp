@@ -64,23 +64,15 @@
         :variable lvar :value (convert value env type-env)
         :body (convert-seq body new-env type-env)))))
 
-#+(or)
 (defmethod convert-special ((operator (eql 'with)) rest env type-env)
-  (destructuring-bind ((var &optional (initializer nil initializerp))
-                       &rest body)
+  (destructuring-bind ((var nbytes) &rest body)
       rest
-    (let* ((lvar (make-variable var))
+    (let* ((lvar (ast:make-variable var))
            (info (make-instance 'variable-info :variable lvar))
-           (initializer
-             (if initializerp
-                 ;; FIXME: Should be a global env probably
-                 (parse-initializer initializer env type-env)
-                 (ast:undef))))
+           (nbytes (convert nbytes env type-env)))
       (make-instance 'ast:with
-        :var lvar
-        :initialization (make-instance 'initialization
-                          :initializer initializer)
-        :body (convertlis
+        :variable lvar :nbytes nbytes
+        :body (convert-seq
                body (make-env (list var) (list info) env) type-env)))))
 
 (defun convert-clause (constructor-name varnames bodyforms env type-env)

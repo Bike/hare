@@ -134,18 +134,20 @@ A form is either
 (defmethod map-ast (function (ast initialization))
   (make-instance 'initialization :initializer (initializer ast)))
 
+;;; This is the primitive form of the WITH operator. It allocates a byte array
+;;; with a possibly variable length. This should be usable along with an
+;;; INITIALIZE primitive to implement the full language's WITH operator.
 (defclass with (ast)
   ((%variable :initarg :variable :accessor variable :type variable)
-   (%initialization :initarg :initialization :accessor initialization
-                    :type initialization)
+   (%nbytes :initarg :nbytes :accessor nbytes :type ast)
    (%body :initarg :body :accessor body :type ast)))
 (defmethod mapnil-ast (function (ast with))
-  (mapnil-ast function (body ast))
-  (mapnil-ast function (initialization ast)))
+  (mapnil-ast function (nbytes ast))
+  (mapnil-ast function (body ast)))
 (defmethod map-ast (function (ast with))
   (make-instance 'with
     :variable (variable ast)
-    :initialization (map-ast function (initialization ast))
+    :nbytes (map-ast function (nbytes ast))
     :body (map-ast function (body ast))))
 
 ;; internal special operator for ! function

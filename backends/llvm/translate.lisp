@@ -305,6 +305,14 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
   ;; FIXME: actually return inert
   :fixme)
 
+(defmethod translate-ast ((ast ast:with) env)
+  (let ((nbytes (ast:nbytes ast)))
+    (assert (typep (ast:type nbytes) 'type:int))
+    (let ((nbytes (translate-ast nbytes env)))
+      (llvm:build-array-alloca *builder* (llvm:int8-type) nbytes
+                               (symbol-name (ast:name (ast:variable ast))))
+      (translate-ast (ast:body ast) env))))
+
 (defmethod translate-ast ((ast ast:literal) env)
   (declare (ignore env))
   (translate-literal (ast:initializer ast)))
