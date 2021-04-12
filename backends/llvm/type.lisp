@@ -2,17 +2,17 @@
 
 (defgeneric type->llvm (type))
 
-(defmethod type->llvm ((type int))
-  (llvm:int-type (int-type-length type)))
+(defmethod type->llvm ((type hare:int))
+  (llvm:int-type (hare:int-type-length type)))
 
-(defmethod type->llvm ((type pointer))
+(defmethod type->llvm ((type hare:pointer))
   (llvm:pointer-type
-   (type->llvm (pointer-type-underlying type))))
+   (type->llvm (hare:pointer-type-underlying type))))
 
-(defmethod type->llvm ((type fun))
+(defmethod type->llvm ((type hare:fun))
   (llvm:function-type
-   (type->llvm (fun-return type))
-   (mapcar #'type->llvm (parameters type))))
+   (type->llvm (hare:fun-return type))
+   (mapcar #'type->llvm (hare:parameters type))))
 
 ;;; So this is pretty weird, right? Yes. Here's the skivvy. In C, arrays and
 ;;; pointers are closely identified; array expressions are converted into
@@ -34,8 +34,8 @@
 ;;; down to at most a LEA.
 ;;; I don't actually know if LLVM allows pointer to array as a function
 ;;; parameter type. Guess I will find out!
-(defmethod type->llvm ((type arrayt))
-  (type->llvm (arrayt-element-type type)))
+(defmethod type->llvm ((type hare:arrayt))
+  (type->llvm (hare:arrayt-element-type type)))
 
 ;;; Sum types (ADTs with more than one constructor) are tricky to describe in
 ;;; LLVM, because it has no direct representation of them, and more annoyingly,
@@ -114,4 +114,4 @@
   (or (values (gethash adt *types*))
       (setf (gethash adt *types*) (compute-layout adt))))
 
-(defmethod type->llvm ((type adt)) (ltype (layout type)))
+(defmethod type->llvm ((type hare:adt)) (ltype (layout type)))

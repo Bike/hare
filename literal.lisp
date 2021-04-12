@@ -1,4 +1,4 @@
-(in-package #:hare)
+(in-package #:hare.ast)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -58,10 +58,10 @@
 
 ;;; abstract
 (defclass initializer ()
-  ((%type :accessor type :initarg :type :type type)))
+  ((%type :accessor type :initarg :type :type hare:type)))
 
 (defclass integer-initializer (initializer)
-  ((%value :accessor value :initarg :value :type (integer 0))))
+  ((%value :accessor value :initarg :value :type (cl:integer 0))))
 
 (defmethod print-object ((i integer-initializer) stream)
   (print-unreadable-object (i stream :type t)
@@ -97,60 +97,6 @@
 (defclass array-initializer (initializer)
   (;; A list of initializers.
    (%elements :accessor elements :initarg :elements :type list)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;
-;;; Parsing
-;;;
-
-(defun parse-literal (literal env type-env)
-  (etypecase literal
-    ((integer 0) (make-instance 'integer-initializer :value literal))
-    ((or (cons (member array arrayn bytes lambda)) (eql undef))
-     (error "Found initializer in literal context: ~a" literal))
-    (symbol (lookup literal env))
-    (cons ; constructor
-     (let* ((cname (car literal)) (fields (cdr literal))
-            (constructor (find-constructor cname type-env)))
-       (make-instance 'constructor-initializer
-         :constructor constructor
-         :fields (loop for field in fields
-                       collect (parse-literal field env type-env)))))))
-
-(defun parse-initializer (initializer env type-env)
-  (etypecase initializer
-    ((integer 0) (make-instance 'integer-initializer :value initializer))
-    ((eql undef) (undef))
-    (symbol
-     (make-instance 'variable-initializer :variable (lookup initializer env)))
-    ((cons (eql lambda))
-     (parse-lambda (cadr initializer) (cddr initializer)
-                   env type-env))
-    ((cons (eql array))
-     (parse-array (rest initializer) env type-env))
-    ((cons (member arrayn bytes))
-     (error "Not implemented yet: ~a" (car initializer)))
-    (cons ; constructor
-     (let* ((cname (car initializer)) (fields (cdr initializer))
-            (constructor (find-constructor cname type-env)))
-       (make-instance 'constructor-initializer
-         :constructor constructor
-         :fields (loop for field in fields
-                       collect (parse-initializer field env type-env)))))))
-
-(defun parse-lambda (params forms env type-env)
-  (let* ((vars (mapcar #'make-variable params))
-         (infos (loop for var in vars
-                      collect (make-instance 'variable-info :variable var)))
-         (env (make-env params infos env)))
-    (make-instance 'lambda-initializer
-      :params vars
-      :body (convert-seq forms env type-env))))
-
-(defun parse-array (elementfs env type-env)
-  (make-instance 'array-initializer
-    :elements (loop for elementf in elementfs
-                    collect (parse-initializer elementf env type-env))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;

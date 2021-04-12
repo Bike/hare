@@ -16,14 +16,14 @@
         collect (convert form env type-env)))
 
 (defun convert-seq (list env type-env)
-  (make-instance 'seq :asts (convertlis list env type-env)))
+  (make-instance 'ast:seq :asts (convertlis list env type-env)))
 
 (defun convert-symbol (symbol env type-env)
   (let ((info (lookup symbol env)))
     (etypecase info
-      (variable-info (make-instance 'reference :variable (variable info)))
+      (variable-info (make-instance 'ast:reference :variable (variable info)))
       (constant-info
-       (make-instance 'literal :initializer (initializer info)))
+       (make-instance 'ast:literal :initializer (initializer info)))
       (symbol-macro-info
        (convert (funcall (expander info) symbol env) env type-env)))))
 
@@ -32,8 +32,8 @@
       (let ((info (lookup head env)))
         (etypecase info
           (variable-info ; ordinary function call
-           (make-instance 'call
-             :callee (make-instance 'reference :variable (variable info))
+           (make-instance 'ast:call
+             :callee (make-instance 'ast:reference :variable (variable info))
              :args (convertlis args env type-env)))
           (symbol-macro-info
            (convert-cons (funcall (expander info) head env)
@@ -44,7 +44,7 @@
           (special-operator-info
            (convert-special head args env type-env))))
       ;; ordinary function call with complex evaluation of the function
-      (make-instance 'call
+      (make-instance 'ast:call
         :callee (convert head env type-env)
         :args (convertlis args env type-env))))
 
@@ -58,10 +58,11 @@
     (let* ((lvar (make-variable varname))
            (info (make-instance 'variable-info :variable lvar))
            (new-env (make-env (list varname) (list info) env)))
-      (make-instance 'bind
+      (make-instance 'ast:bind
         :variable lvar :value (convert value env type-env)
         :body (convert-seq body new-env type-env)))))
 
+#+(or)
 (defmethod convert-special ((operator (eql 'with)) rest env type-env)
   (destructuring-bind ((var &optional (initializer nil initializerp))
                        &rest body)
@@ -72,8 +73,8 @@
              (if initializerp
                  ;; FIXME: Should be a global env probably
                  (parse-initializer initializer env type-env)
-                 (undef))))
-      (make-instance 'with
+                 (ast:undef))))
+      (make-instance 'ast:with
         :var lvar
         :initialization (make-instance 'initialization
                           :initializer initializer)
@@ -96,7 +97,7 @@
                                     :variable variable)))
          (body-env (make-env varnames var-infos env))
          (body (convert-seq bodyforms body-env type-env)))
-    (make-instance 'case-clause
+    (make-instance 'ast:case-clause
       :constructor constructor :variables variables :body body)))
 
 (defun convert-case (head args env type-env)
@@ -109,7 +110,7 @@
            (adt-def (adt-def (constructor (first clauses)))))
       (assert (loop for clause in (rest clauses)
                     always (eq adt-def (adt-def (constructor clause)))))
-      (make-instance 'case
+      (make-instance 'ast:case
         :value (convert value env type-env)
         :clauses clauses
         :case!p (eq head 'case!)
@@ -121,16 +122,71 @@
   (convert-case operator args env type-env))
 
 (defmethod convert-special ((operator (eql 'cons)) args env type-env)
-  (make-instance 'construct
+  (make-instance 'ast:construct
     :constructor (find-constructor (first args) type-env)
     :args (convertlis (rest args) env type-env)))
 
 (defmethod convert-special ((operator (eql 'quote)) args env type-env)
   (destructuring-bind (spec) args
-    (make-instance 'literal
+    (make-instance 'ast:literal
       ;; FIXME: Should be a global env
       :initializer (parse-literal spec env type-env))))
 
 (defun convert-literal (form env type-env)
-  (make-instance 'literal
+  (make-instance 'ast:literal
     :initializer (parse-literal form env type-env)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Parsing literals and initializers
+;;;
+
+(defun parse-literal (literal env type-env)
+  (etypecase literal
+    ((integer 0) (make-instance 'ast:integer-initializer :value literal))
+    ((or (cons (member array arrayn bytes lambda)) (eql undef))
+     (error "Found initializer in literal context: ~a" literal))
+    (symbol (lookup literal env))
+    (cons ; constructor
+     (let* ((cname (car literal)) (fields (cdr literal))
+            (constructor (find-constructor cname type-env)))
+       (make-instance 'ast:constructor-initializer
+         :constructor constructor
+         :fields (loop for field in fields
+                       collect (parse-literal field env type-env)))))))
+
+(defun parse-initializer (initializer env type-env)
+  (etypecase initializer
+    ((integer 0) (make-instance 'ast:integer-initializer :value initializer))
+    ((eql undef) (ast:undef))
+    (symbol
+     (make-instance 'ast:variable-initializer
+       :variable (lookup initializer env)))
+    ((cons (eql lambda))
+     (parse-lambda (cadr initializer) (cddr initializer)
+                   env type-env))
+    ((cons (eql array))
+     (parse-array (rest initializer) env type-env))
+    ((cons (member arrayn bytes))
+     (error "Not implemented yet: ~a" (car initializer)))
+    (cons ; constructor
+     (let* ((cname (car initializer)) (fields (cdr initializer))
+            (constructor (find-constructor cname type-env)))
+       (make-instance 'ast:constructor-initializer
+         :constructor constructor
+         :fields (loop for field in fields
+                       collect (parse-initializer field env type-env)))))))
+
+(defun parse-lambda (params forms env type-env)
+  (let* ((vars (mapcar #'ast:make-variable params))
+         (infos (loop for var in vars
+                      collect (make-instance 'variable-info :variable var)))
+         (env (make-env params infos env)))
+    (make-instance 'ast:lambda-initializer
+      :params vars
+      :body (convert-seq forms env type-env))))
+
+(defun parse-array (elementfs env type-env)
+  (make-instance 'ast:array-initializer
+    :elements (loop for elementf in elementfs
+                    collect (parse-initializer elementf env type-env))))

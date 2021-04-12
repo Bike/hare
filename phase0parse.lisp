@@ -119,7 +119,7 @@
              (unknown-constructor (e)
                (push (name e) (waiting-on-initops tl))
                (return-from phase0parse nil))))
-         (variable (make-variable name))
+         (variable (ast:make-variable name))
          (env (environment pre-module))
          (old-info (forgiving-lookup name env)))
     (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
@@ -310,6 +310,6 @@
       (variable-info)
       (null (setf (lookup name env)
                   (make-instance 'variable-info
-                    :variable (make-variable name)))))
+                    :variable (ast:make-variable name)))))
     (setf (toplevels pre-module) (delete tl (toplevels pre-module) :test #'eq))
     (phase0-var-dependencies pre-module name)))

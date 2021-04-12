@@ -3,13 +3,13 @@
 (defgeneric manifest-initializer (object tysubst))
 (defgeneric manifest-ast (ast tysubst))
 
-(defmethod manifest-initializer ((object integer-initializer) tysubst)
-  (make-instance 'integer-initializer :value (value object)
-                 :type (subst-type tysubst (type object))))
+(defmethod manifest-initializer ((object ast:integer-initializer) tysubst)
+  (make-instance 'ast:integer-initializer :value (ast:value object)
+                 :type (subst-type tysubst (ast:type object))))
 
-(defmethod manifest-initializer ((object variable-initializer) tysubst)
-  (make-instance 'variable-initializer :variable (variable object)
-                 :type (subst-type tysubst (type object))))
+(defmethod manifest-initializer ((object ast:variable-initializer) tysubst)
+  (make-instance 'ast:variable-initializer :variable (variable object)
+                 :type (subst-type tysubst (ast:type object))))
 
 (defun subst-type-list (tysubst list-of-types)
   (loop for type in list-of-types
@@ -20,82 +20,83 @@
     :name (name constructor) :adt-def (adt-def constructor)
     :fields (subst-type-list tysubst (fields constructor))))
 
-(defmethod manifest-initializer ((object constructor-initializer) tysubst)
-  (make-instance 'constructor-initializer
-    :constructor (manifest-constructor (constructor object) tysubst)
-    :fields (loop for field in (fields object)
+(defmethod manifest-initializer ((object ast:constructor-initializer) tysubst)
+  (make-instance 'ast:constructor-initializer
+    :constructor (manifest-constructor (ast:constructor object) tysubst)
+    :fields (loop for field in (ast:fields object)
                   collect (manifest-initializer field tysubst))
-    :type (subst-type tysubst (type object))))
+    :type (subst-type tysubst (ast:type object))))
 
-(defmethod manifest-initializer ((object undef-initializer) tysubst)
-  (make-instance 'undef-initializer :type (subst-type tysubst (type object))))
+(defmethod manifest-initializer ((object ast:undef-initializer) tysubst)
+  (make-instance 'ast:undef-initializer
+    :type (subst-type tysubst (ast:type object))))
 
-(defmethod manifest-initializer ((object lambda-initializer) tysubst)
-  (make-instance 'lambda-initializer :params (params object)
-                 :body (manifest-ast (body object) tysubst)
-                 :type (subst-type tysubst (type object))))
+(defmethod manifest-initializer ((object ast:lambda-initializer) tysubst)
+  (make-instance 'ast:lambda-initializer :params (ast:params object)
+                 :body (manifest-ast (ast:body object) tysubst)
+                 :type (subst-type tysubst (ast:type object))))
 
-(defmethod manifest-initializer ((object array-initializer) tysubst)
-  (make-instance 'array-initializer
-    :elements (loop for element in (elements object)
+(defmethod manifest-initializer ((object ast:array-initializer) tysubst)
+  (make-instance 'ast:array-initializer
+    :elements (loop for element in (ast:elements object)
                     collect (manifest-initializer element tysubst))
-    :type (subst-type tysubst (type object))))
+    :type (subst-type tysubst (ast:type object))))
 
 (defun manifest-ast-list (asts tysubst)
   (loop for ast in asts collect (manifest-ast ast tysubst)))
 
-(defmethod manifest-ast ((ast seq) tysubst)
-  (make-instance 'seq
-    :asts (manifest-ast-list (asts ast) tysubst)
-    :type (subst-type tysubst (type ast))))
+(defmethod manifest-ast ((ast ast:seq) tysubst)
+  (make-instance 'ast:seq
+    :asts (manifest-ast-list (ast:asts ast) tysubst)
+    :type (subst-type tysubst (ast:type ast))))
 
-(defmethod manifest-ast ((ast call) tysubst)
-  (make-instance 'call
-    :callee (manifest-ast (callee ast) tysubst)
-    :args (manifest-ast-list (args ast) tysubst)
-    :type (subst-type tysubst (type ast))))
+(defmethod manifest-ast ((ast ast:call) tysubst)
+  (make-instance 'ast:call
+    :callee (manifest-ast (ast:callee ast) tysubst)
+    :args (manifest-ast-list (ast:args ast) tysubst)
+    :type (subst-type tysubst (ast:type ast))))
 
-(defmethod manifest-ast ((ast literal) tysubst)
-  (make-instance 'literal
-    :initializer (manifest-initializer (initializer ast) tysubst)
-    :type (subst-type tysubst (type ast))))
+(defmethod manifest-ast ((ast ast:literal) tysubst)
+  (make-instance 'ast:literal
+    :initializer (manifest-initializer (ast:initializer ast) tysubst)
+    :type (subst-type tysubst (ast:type ast))))
 
-(defmethod manifest-ast ((ast reference) tysubst)
-  (make-instance 'reference
-    :variable (variable ast) :type (subst-type tysubst (type ast))))
+(defmethod manifest-ast ((ast ast:reference) tysubst)
+  (make-instance 'ast:reference
+    :variable (ast:variable ast) :type (subst-type tysubst (ast:type ast))))
 
-(defmethod manifest-ast ((ast bind) tysubst)
-  (make-instance 'bind
-    :variable (variable ast)
-    :value (manifest-ast (value ast) tysubst)
-    :body (manifest-ast (body ast) tysubst)
-    :type (subst-type tysubst (type ast))))
+(defmethod manifest-ast ((ast ast:bind) tysubst)
+  (make-instance 'ast:bind
+    :variable (ast:variable ast)
+    :value (manifest-ast (ast:value ast) tysubst)
+    :body (manifest-ast (ast:body ast) tysubst)
+    :type (subst-type tysubst (ast:type ast))))
 
 (defun manifest-case-clause (clause tysubst)
-  (make-instance 'case-clause
-    :constructor (manifest-constructor (constructor clause) tysubst)
-    :variables (variables clause)
-    :body (manifest-ast (body clause) tysubst)))
+  (make-instance 'ast:case-clause
+    :constructor (manifest-constructor (ast:constructor clause) tysubst)
+    :variables (ast:variables clause)
+    :body (manifest-ast (ast:body clause) tysubst)))
 
-(defmethod manifest-ast ((ast case) tysubst)
-  (make-instance 'case
-    :value (manifest-ast (value ast) tysubst)
-    :clauses (loop for clause in (clauses ast)
+(defmethod manifest-ast ((ast ast:case) tysubst)
+  (make-instance 'ast:case
+    :value (manifest-ast (ast:value ast) tysubst)
+    :clauses (loop for clause in (ast:clauses ast)
                    collect (manifest-case-clause clause tysubst))
-    :adt-def (adt-def ast) :case!p (case!p ast)
-    :type (subst-type tysubst (type ast))))
+    :adt-def (ast:adt-def ast) :case!p (ast:case!p ast)
+    :type (subst-type tysubst (ast:type ast))))
 
-(defmethod manifest-ast ((ast construct) tysubst)
-  (make-instance 'construct
-    :constructor (constructor ast)
-    :args (loop for arg in (args ast)
+(defmethod manifest-ast ((ast ast:construct) tysubst)
+  (make-instance 'ast:construct
+    :constructor (ast:constructor ast)
+    :args (loop for arg in (ast:args ast)
                 collect (manifest-ast arg tysubst))
-    :type (subst-type tysubst (type ast))))
+    :type (subst-type tysubst (ast:type ast))))
 
 ;;;
 
 (defun check-initializer-typed (initializer)
-  (let ((f (free (type initializer))))
+  (let ((f (free (ast:type initializer))))
     (unless (null f)
       (error "Initializer ~a incompletely manifested as type ~a"
              initializer f))))
@@ -115,7 +116,7 @@
 (defclass monodef (manifestation)
   ((%initializer :initarg :initializer :reader initializer :type initializer)))
 
-(defmethod type ((md monodef)) (type (initializer md)))
+(defmethod type ((md monodef)) (ast:type (initializer md)))
 
 ;;; A variable that is defined elsewhere, but still has a monotype.
 (defclass extern (manifestation)
@@ -178,8 +179,8 @@
                   (loop for mono in complete
                         unless (name mono)
                           do (setf (name mono)
-                                   (mangle (name (variable mono))
-                                           (type (initializer mono)))))
+                                   (mangle (ast:name (variable mono))
+                                           (ast:type (initializer mono)))))
                   (loop for extern in externs
                         unless (name extern)
                           do (setf (name extern)
@@ -197,7 +198,7 @@
                          (setf (name existing) name)))
                    ;; new entry
                    (let* ((einitializer (initializer entry))
-                          (tysubst (unify type (type einitializer)))
+                          (tysubst (unify type (ast:type einitializer)))
                           (initializer
                             (manifest-initializer einitializer tysubst))
                           (infer (inference entry))

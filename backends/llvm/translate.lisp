@@ -35,7 +35,7 @@
 
 (defmethod declare-variable ((type hare:arrayt) &key (name "") initializer)
   (let* ((etype (translate-type (hare:arrayt-element-type type)))
-         (len (if initializer (length (hare::elements initializer)) 0))
+         (len (if initializer (length (ast:elements initializer)) 0))
          (etype* (llvm:array-type etype len))
          (glob (llvm:add-global *module* etype* name)))
     (setf (llvm:alignment glob) 8)
@@ -57,7 +57,7 @@
                   for name = (hare:name mani)
                   for var = (hare:variable mani)
                   for initializer = (hare:initializer mani)
-                  for type = (hare::type initializer)
+                  for type = (ast:type initializer)
                   for val = (declare-variable type :name name
                                                    :initializer initializer)
                   collect (cons var val))))
@@ -83,10 +83,10 @@
 
 (defvar *function*)
 
-(defmethod translate-initializer ((lambda-initializer hare::lambda-initializer)
+(defmethod translate-initializer ((lambda-initializer ast:lambda-initializer)
                                   *function* global-env)
-  (let* ((params (hare::params lambda-initializer))
-         (body (body lambda-initializer))
+  (let* ((params (ast:params lambda-initializer))
+         (body (ast:body lambda-initializer))
          (lparams (llvm:params *function*))
          (env (augment global-env (mapcar #'cons params lparams)))
          (entry (llvm:append-basic-block *function* "entry")))
@@ -97,13 +97,13 @@
           (llvm:build-ret *builder* r)))
       *function*)))
 
-(defmethod translate-initializer ((init hare::array-initializer)
+(defmethod translate-initializer ((init ast:array-initializer)
                                   var global-env)
-  (let* ((etype (type->llvm (hare:arrayt-element-type (hare::type init))))
+  (let* ((etype (type->llvm (hare:arrayt-element-type (ast:type init))))
          (const (llvm:const-array etype
                                   ;; KLUDGE?
                                   (mapcar #'translate-literal
-                                          (hare::elements init)))))
+                                          (ast:elements init)))))
     (llvm:set-initializer var const)
     var))
 
@@ -114,8 +114,8 @@
 Return an LLVMValueRef for the result, or NIL if there isn't one
 (e.g. if there is an escape)."))
 
-(defmethod translate-ast ((ast seq) env)
-  (let ((asts (asts ast)))
+(defmethod translate-ast ((ast ast:seq) env)
+  (let ((asts (ast:asts ast)))
     (if (null asts)
         (error "TODO :(")
         (loop with result = nil
@@ -124,10 +124,10 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
               when (null result) return nil
               finally (return result)))))
 
-(defmethod translate-ast ((ast call) env)
-  (let* ((callee (translate-ast (callee ast) env))
+(defmethod translate-ast ((ast ast:call) env)
+  (let* ((callee (translate-ast (ast:callee ast) env))
          (_ (when (null callee) (return-from translate-ast nil)))
-         (args (loop for arg in (args ast)
+         (args (loop for arg in (ast:args ast)
                      for value = (translate-ast arg env)
                      when (null value)
                        do (return-from translate-ast nil)
@@ -183,22 +183,22 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
                       (incf i)))
     str))
 
-(defmethod translate-ast ((ast construct) env)
-  (let* ((type (hare::type ast))
+(defmethod translate-ast ((ast ast:construct) env)
+  (let* ((type (ast:type ast))
          (layout (layout type))
-         (args (loop for arg in (args ast)
+         (args (loop for arg in (ast:args ast)
                      for value = (translate-ast arg env)
                      when (null value)
                        do (return-from translate-ast nil)
                      else collect value)))
-    (apply #'construct layout type (hare::constructor ast) args)))
+    (apply #'construct layout type (ast:constructor ast) args)))
 
 (defgeneric translate-case (layout value ast env))
 (defmethod translate-case ((layout direct-layout) value ast env)
   ;; Don't need to do any switch; just bind the variables and go
-  (let* ((!p (hare::case!p ast))
-         (clause (first (hare::clauses ast)))
-         (variables (hare::variables clause))
+  (let* ((!p (ast:case!p ast))
+         (clause (first (ast:clauses ast)))
+         (variables (ast:variables clause))
          (fieldvals
            (if !p
                (loop with zero = (llvm:const-int (llvm:int64-type) 0)
@@ -213,7 +213,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
                      collect (llvm:build-extract-value
                               *builder* value i ""))))
          (new-env (augment env (mapcar #'cons variables fieldvals))))
-    (translate-ast (hare:body clause) new-env)))
+    (translate-ast (ast:body clause) new-env)))
 
 (defun make-block (name) (llvm:append-basic-block *function* name))
 
@@ -250,10 +250,10 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
                 collect (dewordify field (subseq words loword hiword)))))
     (augment env (mapcar #'cons vars values))))
 (defmethod translate-case ((layout dumb-layout) value ast env)
-  (when (hare::case!p ast) (error "Not implemented yet"))
-  (let* ((clauses (hare::clauses ast))
+  (when (ast:case!p ast) (error "Not implemented yet"))
+  (let* ((clauses (ast:clauses ast))
          (tag (llvm:build-extract-value *builder* value 0 "tag"))
-         (type (hare::type (hare:value ast)))
+         (type (ast:type (ast:value ast)))
          (words (loop for i from 1 below (nwords type)
                       collect (llvm:build-extract-value *builder* value i "")))
          (default (make-block "case-unreachable"))
@@ -262,10 +262,10 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
     (llvm:position-builder-at-end *builder* default)
     (llvm:build-unreachable *builder*)
     (llvm:position-builder-at-end *builder* merge)
-    (let ((phi (llvm:build-phi *builder* (type->llvm (hare::type ast))
+    (let ((phi (llvm:build-phi *builder* (type->llvm (ast:type ast))
                                "case-result")))
       (loop for clause in clauses
-            for vars = (hare::variables clause)
+            for vars = (ast:variables clause)
             ;; KLUDGE: we use the constructors from the type so that they are
             ;; fully substituted, rather than from the clauses.
             for constructor in (hare:constructors type)
@@ -277,7 +277,7 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
             for new-env = (progn
                             (llvm:position-builder-at-end *builder* block)
                             (dumb-case-env env constructor vars words))
-            for cv = (translate-ast (hare:body clause) new-env)
+            for cv = (translate-ast (ast:body clause) new-env)
             for i from 0
             do (llvm:add-case sw (llvm:const-int (llvm:int64-type) i) block)
             unless (null cv)
@@ -286,16 +286,20 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
       (llvm:position-builder-at-end *builder* merge)
       phi)))
 
-(defmethod translate-ast ((ast case) env)
-  (let* ((value (hare:value ast))
+(defmethod translate-ast ((ast ast:case) env)
+  (let* ((value (ast:value ast))
          (lvalue (or (translate-ast value env)
                      (return-from translate-ast nil)))
-         (vtype (hare::type value)) (layout (layout vtype)))
+         (vtype (ast:type value))
+         (rvtype (if (ast:case!p ast)
+                     (hare:pointer-type-underlying vtype)
+                     vtype))
+         (layout (layout rvtype)))
     (translate-case layout lvalue ast env)))
 
-(defmethod translate-ast ((ast literal) env)
+(defmethod translate-ast ((ast ast:literal) env)
   (declare (ignore env))
-  (translate-literal (initializer ast)))
+  (translate-literal (ast:initializer ast)))
 
 (defun gepify (value)
   (let ((zero (llvm:const-int (llvm:int64-type) 0)))
@@ -307,20 +311,20 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
       (gepify value)
       value))
 
-(defmethod translate-ast ((ast reference) env)
-  (maybe-gepify (lookup (variable ast) env) (hare::type ast)))
+(defmethod translate-ast ((ast ast:reference) env)
+  (maybe-gepify (lookup (ast:variable ast) env) (ast:type ast)))
 
-(defmethod translate-ast ((ast bind) env)
-  (let* ((value (translate-ast (value ast) env))
+(defmethod translate-ast ((ast ast:bind) env)
+  (let* ((value (translate-ast (ast:value ast) env))
          (_ (unless value (return-from translate-ast nil)))
-         (new-env (augment env (list (cons (variable ast) value)))))
+         (new-env (augment env (list (cons (ast:variable ast) value)))))
     (declare (ignore _))
-    (translate-ast (body ast) new-env)))
+    (translate-ast (ast:body ast) new-env)))
 
 ;;;
 
 (defgeneric translate-literal (literal))
 
-(defmethod translate-literal ((literal hare::integer-initializer))
-  (llvm:const-int (translate-type (hare::type literal))
-                  (value literal)))
+(defmethod translate-literal ((literal ast:integer-initializer))
+  (llvm:const-int (translate-type (ast:type literal))
+                  (ast:value literal)))
