@@ -8,10 +8,11 @@
    (:file "conditions" :depends-on ("packages"))
    (:module "type"
     :depends-on ("packages" "conditions")
-    :components ((:file "type")
+    :components ((:file "cache")
+                 (:file "type" :depends-on ("cache"))
                  (:file "polytype" :depends-on ("type"))
                  (:file "type-subst" :depends-on ("polytype" "type"))
-                 (:file "adt" :depends-on ("type-subst" "type"))))
+                 (:file "adt" :depends-on ("type-subst" "type" "cache"))))
    (:module "ast"
     :depends-on ("packages" "type")
     :components ((:file "ast")

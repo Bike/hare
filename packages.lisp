@@ -1,8 +1,8 @@
 (defpackage #:hare.type
   (:use #:cl)
   (:shadow #:type)
-  (:export #:with-type-cache
-           #:type #:type=
+  (:export #:type-cache #:with-type-cache)
+  (:export #:type #:type=
            #:int #:int-type-length #:make-int
            #:pointer #:pointer-type-underlying #:make-pointer
            #:fun #:fun-return #:parameters #:make-fun
