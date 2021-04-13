@@ -24,7 +24,7 @@
   (:export #:type)
   (:export #:variable #:make-variable)
   (:export #:initializer
-           #:mapnil-initializer
+           #:mapnil-initializer #:map-initializer #:copy-initializer
            #:integer-initializer #:value
            #:variable-initializer
            #:constructor-initializer #:constructor #:fields
@@ -32,7 +32,7 @@
            #:lambda-initializer #:params #:body
            #:array-initializer #:elements)
   (:export #:ast
-           #:mapnil-ast #:map-ast
+           #:mapnil-ast #:map-ast #:copy-ast
            #:seq #:asts
            #:call #:callee #:args
            #:literal #:initializer

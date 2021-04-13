@@ -1,109 +1,11 @@
 (in-package #:hare)
 
-(defgeneric manifest-initializer (object tysubst))
-(defgeneric manifest-ast (ast tysubst))
-
-(defmethod manifest-initializer ((object ast:integer-initializer) tysubst)
-  (make-instance 'ast:integer-initializer :value (ast:value object)
-                 :type (type:subst-type tysubst (ast:type object))))
-
-(defmethod manifest-initializer ((object ast:variable-initializer) tysubst)
-  (make-instance 'ast:variable-initializer :variable (variable object)
-                 :type (type:subst-type tysubst (ast:type object))))
-
-(defun subst-type-list (tysubst list-of-types)
-  (loop for type in list-of-types
-        collect (type:subst-type tysubst type)))
-
-(defun manifest-constructor (constructor tysubst)
-  (make-instance 'constructor
-    :name (name constructor) :adt-def (type:adt-def constructor)
-    :fields (subst-type-list tysubst (type:fields constructor))))
-
-(defmethod manifest-initializer ((object ast:constructor-initializer) tysubst)
-  (make-instance 'ast:constructor-initializer
-    :constructor (manifest-constructor (ast:constructor object) tysubst)
-    :fields (loop for field in (ast:fields object)
-                  collect (manifest-initializer field tysubst))
-    :type (type:subst-type tysubst (ast:type object))))
-
-(defmethod manifest-initializer ((object ast:undef-initializer) tysubst)
-  (make-instance 'ast:undef-initializer
-    :type (type:subst-type tysubst (ast:type object))))
-
-(defmethod manifest-initializer ((object ast:lambda-initializer) tysubst)
-  (make-instance 'ast:lambda-initializer :params (ast:params object)
-                 :body (manifest-ast (ast:body object) tysubst)
-                 :type (type:subst-type tysubst (ast:type object))))
-
-(defmethod manifest-initializer ((object ast:array-initializer) tysubst)
-  (make-instance 'ast:array-initializer
-    :elements (loop for element in (ast:elements object)
-                    collect (manifest-initializer element tysubst))
-    :type (type:subst-type tysubst (ast:type object))))
-
-(defun manifest-ast-list (asts tysubst)
-  (loop for ast in asts collect (manifest-ast ast tysubst)))
-
-(defmethod manifest-ast ((ast ast:seq) tysubst)
-  (make-instance 'ast:seq
-    :asts (manifest-ast-list (ast:asts ast) tysubst)
-    :value (manifest-ast (ast:value ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:call) tysubst)
-  (make-instance 'ast:call
-    :callee (manifest-ast (ast:callee ast) tysubst)
-    :args (manifest-ast-list (ast:args ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:literal) tysubst)
-  (make-instance 'ast:literal
-    :initializer (manifest-initializer (ast:initializer ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:reference) tysubst)
-  (make-instance 'ast:reference
-    :variable (ast:variable ast) :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:bind) tysubst)
-  (make-instance 'ast:bind
-    :variable (ast:variable ast)
-    :value (manifest-ast (ast:value ast) tysubst)
-    :body (manifest-ast (ast:body ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defun manifest-case-clause (clause tysubst)
-  (make-instance 'ast:case-clause
-    :constructor (manifest-constructor (ast:constructor clause) tysubst)
-    :variables (ast:variables clause)
-    :body (manifest-ast (ast:body clause) tysubst)))
-
-(defmethod manifest-ast ((ast ast:case) tysubst)
-  (make-instance 'ast:case
-    :value (manifest-ast (ast:value ast) tysubst)
-    :clauses (loop for clause in (ast:clauses ast)
-                   collect (manifest-case-clause clause tysubst))
-    :adt-def (ast:adt-def ast) :case!p (ast:case!p ast)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:construct) tysubst)
-  (make-instance 'ast:construct
-    :constructor (ast:constructor ast)
-    :args (manifest-ast-list (ast:args ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:primitive) tysubst)
-  (make-instance 'ast:primitive
-    :name (ast:name ast) :args (manifest-ast-list (ast:args ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
-
-(defmethod manifest-ast ((ast ast:with) tysubst)
-  (make-instance 'ast:with
-    :variable (ast:variable ast)
-    :nbytes (manifest-ast (ast:nbytes ast) tysubst)
-    :body (manifest-ast (ast:body ast) tysubst)
-    :type (type:subst-type tysubst (ast:type ast))))
+(defun manifest-initializer (initializer tysubst)
+  (let ((copy (ast:copy-initializer initializer)))
+    (ast:mapnil-initializer
+     (lambda (o) (setf (ast:type o) (type:subst-type tysubst (ast:type o))))
+     copy)
+    copy))
 
 ;;;
 

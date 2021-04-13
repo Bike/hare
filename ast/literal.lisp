@@ -100,30 +100,55 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
-;;; Mapping (for effect)
+;;; Mapping
 ;;;
 
 (defgeneric mapnil-initializer (function initializer)
   (:argument-precedence-order initializer function)
   (:method :before (function (initializer initializer))
     (funcall function initializer)))
+(defgeneric map-initializer (function initializer)
+  (:argument-precedence-order initializer function)
+  (:method :around (function (i initializer))
+    (or (funcall function i) (call-next-method))))
+(defun copy-initializer (initializer)
+  (map-initializer (constantly nil) initializer))
 
 (defmethod mapnil-initializer (function (i integer-initializer))
   (declare (ignore function)))
+(defmethod map-initializer (function (i integer-initializer))
+  (make-instance 'integer-initializer :value (value i) :type (type i)))
 
 (defmethod mapnil-initializer (function (i variable-initializer))
   (declare (ignore function)))
+(defmethod map-initializer (function (i variable-initializer))
+  (make-instance 'variable-initializer :variable (variable i) :type (type i)))
 
 (defmethod mapnil-initializer (function (i constructor-initializer))
   (loop for field in (fields i)
         do (mapnil-initializer function field)))
+(defmethod map-initializer (function (i constructor-initializer))
+  (make-instance 'constructor-initializer
+    :constructor (constructor i) :type (type i)
+    :fields (loop for field in (fields i)
+                  collect (map-initializer function field))))
 
 (defmethod mapnil-initializer (function (i undef-initializer))
   (declare (ignore function)))
+(defmethod map-initializer (function (i undef-initializer))
+  (make-instance 'undef-initializer :type (type i)))
 
 (defmethod mapnil-initializer (function (i lambda-initializer))
-  (declare (ignore function)))
+  (mapnil-ast function (body i)))
+(defmethod map-initializer (function (i lambda-initializer))
+  (make-instance 'lambda-initializer
+    :params (params i) :type (type i)
+    :body (map-ast function (body i))))
 
 (defmethod mapnil-initializer (function (i array-initializer))
   (loop for elem in (elements i)
         do (mapnil-initializer function elem)))
+(defmethod map-initializer (function (i array-initializer))
+  (make-instance 'array-initializer
+    :type (type i) :elements (loop for e in (elements i)
+                                   collect (map-initializer function e))))

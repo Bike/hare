@@ -39,17 +39,21 @@ A form is either
 (defclass ast ()
   ((%type :accessor type :initarg :type :type type:type)))
 
-;;; Apply function to AST and its component ASTs. Return value undefined.
+;;; Apply function to AST and its component ASTs and initializers.
+;;; Return value undefined.
 (defgeneric mapnil-ast (function ast)
   (:argument-precedence-order ast function)
   (:method :before (function (ast ast)) (funcall function ast)))
 ;;; Apply function to ast. If it returns non-nil, return that.
-;;; Otherwise, copy the ast, recursively map-ast-ing any component ASTs.
+;;; Otherwise, copy the ast, recursively map-ast-ing any component ASTs
+;;; and any component initializers.
 ;;; MUST copy, even if there are no components.
+;;; Assumes all slots are bound, including the type.
 (defgeneric map-ast (function ast)
   (:argument-precedence-order ast function)
   (:method :around (function (ast ast))
     (or (funcall function ast) (call-next-method))))
+(defun copy-ast (ast) (map-ast (constantly nil) ast))
 
 (defun mapnil-asts (function asts)
   (loop for ast in asts do (mapnil-ast function ast)))
@@ -66,7 +70,7 @@ A form is either
   (mapnil-ast function (value ast)))
 (defmethod map-ast (function (ast seq))
   (make-instance 'seq :asts (map-asts function (asts ast))
-                 :value (map-ast function (value ast))))
+                 :value (map-ast function (value ast)) :type (type ast)))
 
 (defclass call (ast)
   ((%callee :accessor callee :initarg :callee :type ast)
@@ -78,7 +82,7 @@ A form is either
 (defmethod map-ast (function (ast call))
   (make-instance 'call
     :callee (map-ast function (callee ast))
-    :args (map-asts function (args ast))))
+    :args (map-asts function (args ast)) :type (type ast)))
 
 ;;; This is separate from the initializer, because initializers are
 ;;; polymorphic. That is, they cannot have a monotype, but any particular
@@ -88,9 +92,11 @@ A form is either
    ;; a restricted subset of initializers.
    (%initializer :initarg :initializer :accessor initializer
                  :type initializer)))
-(defmethod mapnil-ast (function (ast literal)) (declare (ignore function)))
+(defmethod mapnil-ast (function (ast literal))
+  (mapnil-initializer function (initializer ast)))
 (defmethod map-ast (function (ast literal))
-  (make-instance 'literal :initializer (initializer ast)))
+  (make-instance 'literal
+    :initializer (map-initializer function (initializer ast)) :type (type ast)))
 
 (defclass variable ()
   ((%name :accessor name :initarg :name :type symbol)))
@@ -107,7 +113,7 @@ A form is either
   ((%variable :initarg :variable :accessor variable :type variable)))
 (defmethod mapnil-ast (function (ast reference)) (declare (ignore function)))
 (defmethod map-ast (function (ast reference))
-  (make-instance 'reference :variable (variable ast)))
+  (make-instance 'reference :variable (variable ast) :type (type ast)))
 
 ;; LET with one variable
 (defclass bind (ast)
@@ -121,18 +127,7 @@ A form is either
   (make-instance 'bind
     :variable (variable ast)
     :value (map-ast function (value ast))
-    :body (map-ast function (body ast))))
-
-;;; This AST is currently used only in a WITH.
-;;; It's needed because we need a stable type for the initializer
-;;; even though it may have polymorphic components.
-(defclass initialization (ast)
-  ((%initializer :initarg :initializer :accessor initializer
-                 :type initializer)))
-(defmethod mapnil-ast (function (ast initialization))
-  (declare (ignore function)))
-(defmethod map-ast (function (ast initialization))
-  (make-instance 'initialization :initializer (initializer ast)))
+    :body (map-ast function (body ast)) :type (type ast)))
 
 ;;; This is the primitive form of the WITH operator. It allocates a byte array
 ;;; with a possibly variable length. This should be usable along with an
@@ -148,7 +143,7 @@ A form is either
   (make-instance 'with
     :variable (variable ast)
     :nbytes (map-ast function (nbytes ast))
-    :body (map-ast function (body ast))))
+    :body (map-ast function (body ast)) :type (type ast)))
 
 ;; For things with function syntax that the compiler handles specially
 (defclass primitive (ast)
@@ -159,7 +154,7 @@ A form is either
   (mapnil-asts function (args ast)))
 (defmethod map-ast (function (ast primitive))
   (make-instance 'primitive
-    :name (name ast) :args (map-asts function (args ast))))
+    :name (name ast) :args (map-asts function (args ast)) :type (type ast)))
 
 (defclass case-clause ()
   ((%constructor :initarg :constructor :accessor constructor
@@ -189,7 +184,8 @@ A form is either
                    collect (make-instance 'case-clause
                              :constructor (constructor clause)
                              :variables (variables clause)
-                             :body (map-ast function (body clause))))))
+                             :body (map-ast function (body clause))))
+    :type (type ast)))
 
 (defclass construct (ast)
   ((%constructor :initarg :constructor :accessor constructor
@@ -200,4 +196,4 @@ A form is either
   (mapnil-asts function (args ast)))
 (defmethod map-ast (function (ast construct))
   :constructor (constructor ast)
-  :args (map-asts function (args ast)))
+  :args (map-asts function (args ast)) :type (type ast))

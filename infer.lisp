@@ -214,15 +214,10 @@
 (defun infer-initializer-toplevel (initializer tenv)
   (let* ((inference (infer-initializer initializer tenv))
          (tysubst (tysubst inference)))
-    (flet ((subst-ast (ast)
-             (setf (ast:type ast) (type:subst-type tysubst (ast:type ast)))))
-      (ast:mapnil-initializer
-       (lambda (initializer)
-         (setf (ast:type initializer)
-               (type:subst-type tysubst (ast:type initializer)))
-         (when (typep initializer 'ast:lambda-initializer)
-           (ast:mapnil-ast #'subst-ast (ast:body initializer))))
-       initializer))
+    (ast:mapnil-initializer
+     (lambda (thing)
+       (setf (ast:type thing) (type:subst-type tysubst (ast:type thing))))
+     initializer)
     (finalize-inference inference)))
 
 (defmethod infer-initializer ((initializer ast:integer-initializer) tenv)
