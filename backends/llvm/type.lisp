@@ -14,28 +14,8 @@
    (type->llvm (type:fun-return type))
    (mapcar #'type->llvm (type:parameters type))))
 
-;;; So this is pretty weird, right? Yes. Here's the skivvy. In C, arrays and
-;;; pointers are closely identified; array expressions are converted into
-;;; pointers in almost all contexts. LLVM is somewhat more explicit, so we can
-;;; do things like declare functions have pointers to arrays as arguments, but
-;;; these are distinct from regular pointers. So if HYPOTHETICALLY we wanted to
-;;; describe C puts, say, we say it takes an i8*. But in Hare terms a C string
-;;; is a pointer to an i8 array, which is a different type, so we can't pass
-;;; our strings to puts so well.
-;;; Point is, defining this method like this means that (pointer (array i8))
-;;; will end up as i8* like in C.
-;;; Now that I'm coming down from the exuberance of finally fucking printing
-;;; anything, I think I need to pronounce this method a KLUDGE. First off it
-;;; means we need to special case it whenever we actually do mean an array type,
-;;; like in constants or struct definitions. Secondly, once array operators are
-;;; defined, there will be an operator ("aref", probably) to get a pointer to
-;;; element from a pointer to array, i.e. "&(arr[n])" in C. Then if we want to
-;;; call C puts or whatnot we just use that operator, which of course compiles
-;;; down to at most a LEA.
-;;; I don't actually know if LLVM allows pointer to array as a function
-;;; parameter type. Guess I will find out!
 (defmethod type->llvm ((type type:arrayt))
-  (type->llvm (type:arrayt-element-type type)))
+  (llvm:array-type (type->llvm (type:arrayt-element-type type)) 0))
 
 ;;; Sum types (ADTs with more than one constructor) are tricky to describe in
 ;;; LLVM, because it has no direct representation of them, and more annoyingly,

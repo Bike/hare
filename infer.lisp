@@ -361,13 +361,43 @@
     (compose-inferences/2 ninf binf)))
 
 (defparameter *primitive-types*
-  (list (cons '! (lambda ()
+  (list
+   ;; load a value from a pointer
+   (cons '! (lambda ()
                    (let ((ty (type:make-tvar)))
                      (values ty (list (type:make-pointer ty))))))
-        (cons 'set! (lambda ()
-                      (let ((ty (type:make-tvar)))
-                        (values (type:inert)
-                                (list (type:make-pointer ty) ty)))))))
+   ;; store a value to a pointer
+   (cons 'set! (lambda ()
+                 (let ((ty (type:make-tvar)))
+                   (values (type:inert)
+                           (list (type:make-pointer ty) ty)))))
+   ;; return a pointer to an element of an array
+   (cons 'ref (lambda ()
+                (let ((vty (type:make-tvar "element"))
+                      (ity (type:make-tvar "index")))
+                  (values (type:make-pointer vty)
+                          (list (type:make-pointer (type:make-arrayt vty))
+                                ity)))))
+   ;; return a subarray
+   (cons 'aref (lambda ()
+                 (let ((aty (type:make-pointer
+                             (type:make-arrayt (type:make-tvar "element"))))
+                       (ity (type:make-tvar "index")))
+                   (values aty (list aty ity)))))
+   ;; Cast a pointer to object into a pointer to bytearray
+   (cons 'bytescast (lambda ()
+                      (let ((oty (type:make-pointer (type:make-tvar "object")))
+                            (bytearray (type:make-pointer
+                                        (type:make-arrayt
+                                         ;; FIXME: avoid magic number
+                                         (type:make-int 8)))))
+                        (values bytearray (list oty)))))
+   ;; Cast a pointer to bytearray to a pointer to object
+   (cons 'castbytes (lambda ()
+                      (let ((oty (type:make-pointer (type:make-tvar "object")))
+                            (bytearray (type:make-pointer
+                                        (type:make-arrayt (type:make-int 8)))))
+                        (values oty (list bytearray)))))))
 
 (defmethod infer ((ast ast:primitive) tenv)
   ;; basically a slightly dumber version of call ASTs.

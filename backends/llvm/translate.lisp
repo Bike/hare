@@ -296,16 +296,47 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
 
 ;;; TODO: pointer-load and pointer-store will be much more involved when they're
 ;;; layout dependent; essentially doing some semiarbitrary mapping
+(defgeneric translate-primitive (name args env))
+(defmethod translate-primitive ((name (eql 'hare::!)) ast env)
+  (let ((args (ast:args ast)))
+    (llvm:build-load *builder* (translate-ast (first args) env) "")))
+(defmethod translate-primitive ((name (eql 'hare::set!)) ast env)
+  (let ((args (ast:args ast)))
+    (llvm:build-store *builder*
+                      (translate-ast (second args) env)
+                      (translate-ast (first args) env)))
+  ;; FIXME: actually return inert
+  :fixme)
+(defmethod translate-primitive ((name (eql 'hare::ref)) ast env)
+  (let* ((args (ast:args ast))
+         (arrayp (translate-ast (first args) env))
+         (index (translate-ast (second args) env)))
+    (assert (typep (ast:type (second args)) 'type:int))
+    (llvm:build-gep *builder* arrayp
+                    (list (llvm:const-int (llvm:int64-type) 0) index) "")))
+(defmethod translate-primitive ((name (eql 'hare::aref)) ast env)
+  (let* ((args (ast:args ast))
+         (arrayp (translate-ast (first args) env))
+         (index (translate-ast (second args) env)))
+    (assert (typep (ast:type (second args)) 'type:int))
+    ;; GEP on an array gets an array element, so we need to cast back to get an
+    ;; array type again. I think.
+    (llvm:build-bit-cast
+     *builder*
+     (llvm:build-gep *builder* arrayp
+                     (list (llvm:const-int (llvm:int64-type) 0) index) "")
+     (type->llvm (ast:type (first args))) "")))
+(defmethod translate-primitive ((name (eql 'hare::bytescast)) ast env)
+  (llvm:build-bit-cast
+   *builder* (translate-ast (first (ast:args ast)) env)
+   (llvm:pointer-type (llvm:array-type (llvm:int8-type) 0)) ""))
+(defmethod translate-primitive ((name (eql 'hare::castbytes)) ast env)
+  (let ((ty (type->llvm (ast:type ast))))
+    (llvm:build-bit-cast
+     *builder* (translate-ast (first (ast:args ast)) env) ty "")))
+
 (defmethod translate-ast ((ast ast:primitive) env)
-  (ecase (ast:name ast)
-    ((hare::!)
-     (llvm:build-load *builder* (translate-ast (first (ast:args ast)) env) ""))
-    ((hare::set!)
-     (llvm:build-store *builder*
-                       (translate-ast (second (ast:args ast)) env)
-                       (translate-ast (first (ast:args ast)) env))
-     ;; FIXME: actually return inert
-     :fixme)))
+  (translate-primitive (ast:name ast) ast env))
 
 (defmethod translate-ast ((ast ast:with) env)
   (let ((nbytes (ast:nbytes ast)))
@@ -319,18 +350,8 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
   (declare (ignore env))
   (translate-literal (ast:initializer ast)))
 
-(defun gepify (value)
-  (let ((zero (llvm:const-int (llvm:int64-type) 0)))
-    (llvm:build-in-bounds-gep *builder* value (list zero zero) "darr")))
-
-(defun maybe-gepify (value type)
-  (if (and (typep type 'type:pointer)
-           (typep (type:pointer-type-underlying type) 'type:arrayt))
-      (gepify value)
-      value))
-
 (defmethod translate-ast ((ast ast:reference) env)
-  (maybe-gepify (lookup (ast:variable ast) env) (ast:type ast)))
+  (lookup (ast:variable ast) env))
 
 (defmethod translate-ast ((ast ast:bind) env)
   (let* ((value (translate-ast (ast:value ast) env))
