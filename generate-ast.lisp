@@ -75,6 +75,12 @@
         :body (convert-seq
                body (make-env (list var) (list info) env) type-env)))))
 
+(defmethod convert-special ((operator (eql 'initialize)) rest env type-env)
+  (destructuring-bind (ptr init) rest
+    (make-instance 'ast:initialize
+      :value (convert ptr env type-env)
+      :initializer (parse-initializer init env type-env))))
+
 (defun convert-clause (constructor-name varnames bodyforms env type-env)
   (let* ((constructor (find-constructor constructor-name type-env))
          (variables (loop for varname in varnames

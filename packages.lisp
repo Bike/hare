@@ -36,10 +36,10 @@
            #:mapnil-ast #:map-ast #:copy-ast
            #:seq #:asts
            #:call #:callee #:args
-           #:literal #:initializer
+           #:literal
            #:reference #:name
            #:bind
-           #:with
+           #:with #:initialize
            #:primitive
            #:case #:adt-def #:clauses #:case!p
            #:case-clause #:variables

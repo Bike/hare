@@ -25,6 +25,12 @@ A form is either
       a value is stored in it, the consequences are undefined.
      If the pointer is dereferenced after the with form exits,
       the consequences are undefined.
+   * (initialize form initializer) initializes form, which must be a pointer, to
+      an object initializer can initialize. Returns inert.
+     This operator is necessary for initializing pointers to unsized data, as
+      for example obtained by malloc in combination with castbytes.
+     In general it ends up kind of like a memcpy from constant space, which is
+      probably okay conceptually despite being sorta high level?
    * otherwise, a function call. The callee must be a function pointer
       with types matching the arguments.
  * A literal (see literals.lisp)
@@ -144,6 +150,23 @@ A form is either
     :variable (variable ast)
     :nelements (map-ast function (nelements ast))
     :body (map-ast function (body ast)) :type (type ast)))
+
+;;; Given a pointer to an object, initialize it with the given initializer.
+;;; This can be used internally to implement WITH, but should probably also be
+;;; exposed to the user so they can do things like initialize malloc'd memory.
+(defclass initialize (ast)
+  (;; the pointer
+   (%value :initarg :value :accessor value :type ast)
+   (%initializer :initarg :initializer :accessor initializer
+                 :type initializer)))
+(defmethod mapnil-ast (function (ast initialize))
+  (mapnil-ast function (value ast))
+  (mapnil-initializer function (initializer ast)))
+(defmethod map-ast (function (ast initialize))
+  (make-instance 'initialize
+    :value (map-ast function (value ast))
+    :initializer (map-initializer function (initializer ast))
+    :type (type ast)))
 
 ;; For things with function syntax that the compiler handles specially
 (defclass primitive (ast)

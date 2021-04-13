@@ -340,11 +340,6 @@
     (setf (ast:type ast) (ast:type body))
     (inference-sans (compose-inferences/2 ivalue ibody) (list variable))))
 
-#|
-(defmethod infer ((ast initialization) tenv)
-  (values (initializer-type (initializer ast) tenv) (empty-subst)))
-|#
-
 (defmethod infer ((ast ast:with) tenv)
   (let* ((ninf (infer (ast:nelements ast) tenv))
          (var (ast:variable ast))
@@ -354,6 +349,15 @@
          (binf (infer (ast:body ast) nenv)))
     (setf (ast:type ast) (ast:type (ast:body ast)))
     (compose-inferences/2 ninf binf)))
+
+(defmethod infer ((ast ast:initialize) tenv)
+  (let* ((pinf (infer (ast:value ast) tenv))
+         (iinf (infer-initializer (ast:initializer ast) tenv))
+         (ty (type:make-tvar)) (pty (type:make-pointer ty))
+         (pu (unify (ast:type (ast:value ast)) pty))
+         (iu (unify (ast:type (ast:initializer ast)) ty)))
+    (setf (ast:type ast) (type:inert))
+    (subst-inference pu (subst-inference iu (compose-inferences/2 pinf iinf)))))
 
 (defparameter *primitive-types*
   (list
