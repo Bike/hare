@@ -374,7 +374,7 @@
    ;; return a pointer to an element of an array
    (cons 'ref (lambda ()
                 (let ((vty (type:make-tvar "element"))
-                      (ity (type:make-tvar "index")))
+                      (ity (type:make-int 64)))
                   (values (type:make-pointer vty)
                           (list (type:make-pointer (type:make-arrayt vty))
                                 ity)))))
@@ -382,7 +382,7 @@
    (cons 'aref (lambda ()
                  (let ((aty (type:make-pointer
                              (type:make-arrayt (type:make-tvar "element"))))
-                       (ity (type:make-tvar "index")))
+                       (ity (type:make-int 64)))
                    (values aty (list aty ity)))))
    ;; Cast a pointer to object into a pointer to bytearray
    (cons 'bytescast (lambda ()
