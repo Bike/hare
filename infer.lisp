@@ -372,7 +372,7 @@
                            (list (type:make-pointer ty) ty)))))
    ;; return a pointer to an element of an array
    (cons 'ref (lambda ()
-                (let ((vty (type:make-tvar "element"))
+                (let ((vty (type:make-tvar '#:element))
                       (ity (type:make-int 64)))
                   (values (type:make-pointer vty)
                           (list (type:make-pointer (type:make-arrayt vty))
@@ -380,12 +380,12 @@
    ;; return a subarray
    (cons 'aref (lambda ()
                  (let ((aty (type:make-pointer
-                             (type:make-arrayt (type:make-tvar "element"))))
+                             (type:make-arrayt (type:make-tvar '#:element))))
                        (ity (type:make-int 64)))
                    (values aty (list aty ity)))))
    ;; Cast a pointer to object into a pointer to bytearray
    (cons 'bytescast (lambda ()
-                      (let ((oty (type:make-pointer (type:make-tvar "object")))
+                      (let ((oty (type:make-pointer (type:make-tvar '#:object)))
                             (bytearray (type:make-pointer
                                         (type:make-arrayt
                                          ;; FIXME: avoid magic number
@@ -393,7 +393,7 @@
                         (values bytearray (list oty)))))
    ;; Cast a pointer to bytearray to a pointer to object
    (cons 'castbytes (lambda ()
-                      (let ((oty (type:make-pointer (type:make-tvar "object")))
+                      (let ((oty (type:make-pointer (type:make-tvar '#:object)))
                             (bytearray (type:make-pointer
                                         (type:make-arrayt (type:make-int 8)))))
                         (values oty (list bytearray)))))))
