@@ -25,6 +25,10 @@
 ;;;  * (arrayn n) where n is an integer constant. Short for an array of length
 ;;;    n where all elements are undef.
 ;;;  * (lambda (symbol*) form*) is a function.
+;;;  * (vla form) is an array with a length defined at runtime by the form,
+;;;    which must evaluate to an integer. All elements are undef.
+;;;    This initializer is only permitted within a function, i.e. is not
+;;;    allowed at top level.
 ;;;  * (bytes initializer) indicates a byte vector where the bytes are taken
 ;;;    from the object representation corresponding to the initializer.
 ;;;
@@ -98,6 +102,9 @@
   (;; A list of initializers.
    (%elements :accessor elements :initarg :elements :type list)))
 
+(defclass vla-initializer (initializer)
+  ((%nelements :accessor nelements :initarg :nelements :type ast)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; Mapping
@@ -152,3 +159,9 @@
   (make-instance 'array-initializer
     :type (type i) :elements (loop for e in (elements i)
                                    collect (map-initializer function e))))
+
+(defmethod mapnil-initializer (function (i vla-initializer))
+  (mapnil-ast (nelements i)))
+(defmethod map-initializer (function (i vla-initializer))
+  (make-instance 'vla-initializer
+    :type (type i) :nelements (map-ast function (nelements i))))

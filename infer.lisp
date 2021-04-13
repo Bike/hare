@@ -346,7 +346,7 @@
 |#
 
 (defmethod infer ((ast ast:with) tenv)
-  (let* ((ninf (infer (ast:nbytes ast) tenv))
+  (let* ((ninf (infer (ast:nelements ast) tenv))
          (var (ast:variable ast))
          (ty (type:make-tvar (symbol-name (ast:name var))))
          (pty (type:make-pointer ty))

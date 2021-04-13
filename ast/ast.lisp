@@ -134,15 +134,15 @@ A form is either
 ;;; INITIALIZE primitive to implement the full language's WITH operator.
 (defclass with (ast)
   ((%variable :initarg :variable :accessor variable :type variable)
-   (%nbytes :initarg :nbytes :accessor nbytes :type ast)
+   (%nelements :initarg :nelements :accessor nelements :type ast)
    (%body :initarg :body :accessor body :type ast)))
 (defmethod mapnil-ast (function (ast with))
-  (mapnil-ast function (nbytes ast))
+  (mapnil-ast function (nelements ast))
   (mapnil-ast function (body ast)))
 (defmethod map-ast (function (ast with))
   (make-instance 'with
     :variable (variable ast)
-    :nbytes (map-ast function (nbytes ast))
+    :nelements (map-ast function (nelements ast))
     :body (map-ast function (body ast)) :type (type ast)))
 
 ;; For things with function syntax that the compiler handles specially

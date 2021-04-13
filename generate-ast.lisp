@@ -65,13 +65,13 @@
         :body (convert-seq body new-env type-env)))))
 
 (defmethod convert-special ((operator (eql 'with)) rest env type-env)
-  (destructuring-bind ((var nbytes) &rest body)
+  (destructuring-bind ((var nelements) &rest body)
       rest
     (let* ((lvar (ast:make-variable var))
            (info (make-instance 'variable-info :variable lvar))
-           (nbytes (convert nbytes env type-env)))
+           (nelements (convert nelements env type-env)))
       (make-instance 'ast:with
-        :variable lvar :nbytes nbytes
+        :variable lvar :nelements nelements
         :body (convert-seq
                body (make-env (list var) (list info) env) type-env)))))
 
@@ -160,6 +160,9 @@
                    env type-env))
     ((cons (eql array))
      (parse-array (rest initializer) env type-env))
+    ((cons (eql vla))
+     (make-instance 'ast:vla-initializer
+       :nelements (convert (second initializer) env type-env)))
     ((cons (member arrayn bytes))
      (error "Not implemented yet: ~a" (car initializer)))
     (cons ; constructor

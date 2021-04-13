@@ -30,7 +30,8 @@
            #:constructor-initializer #:constructor #:fields
            #:undef-initializer #:undef
            #:lambda-initializer #:params #:body
-           #:array-initializer #:elements)
+           #:array-initializer #:elements
+           #:vla-initializer #:nelements)
   (:export #:ast
            #:mapnil-ast #:map-ast #:copy-ast
            #:seq #:asts
@@ -38,7 +39,7 @@
            #:literal #:initializer
            #:reference #:name
            #:bind
-           #:with #:nbytes
+           #:with
            #:primitive
            #:case #:adt-def #:clauses #:case!p
            #:case-clause #:variables
