@@ -33,6 +33,10 @@
   (let ((type (translate-type type)))
     (llvm:add-function *module* name type)))
 
+(defmethod declare-variable ((type type:int) &key (name "") initializer)
+  (declare (ignore initializer))
+  (llvm:add-global *module* (type->llvm type) name))
+
 (defmethod declare-variable ((type type:arrayt) &key (name "") initializer)
   (let* ((etype (translate-type (type:arrayt-element-type type)))
          (len (if initializer (length (ast:elements initializer)) 0))
@@ -80,6 +84,12 @@
 ;;;
 
 (defgeneric translate-initializer (initializer valref global-env))
+
+(defmethod translate-initializer ((init ast:integer-initializer)
+                                  var global-env)
+  (llvm:set-initializer var (llvm:const-int (type->llvm (ast:type init))
+                                            (ast:value init)))
+  var)
 
 (defvar *function*)
 
