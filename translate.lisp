@@ -36,11 +36,11 @@
            kwargs)))
 
 #|
-(build '((defvar main (lambda (argc argv) (puts hello)))
-         (declaim (type () (function (int 32) (pointer (array (int 8)))) puts) (variable puts))
+(build '((defvar main (lambda (argc argv) (puts (primitive ref hello 0))))
+         (declaim (type () (function (int 32) (pointer (int 8))) puts) (variable puts))
          (defvar hello (array 72 101 108 108 111 44 32 119 111 114 108 100 33 0)))
        '((main (function (int 32) (int 32) (pointer (pointer (int 8)))) "main")
-         (puts (function (int 32) (pointer (array (int 8)))) "puts"))
+         (puts (function (int 32) (pointer (int 8))) "puts"))
        'hare-llvm:llvm)
 (build '((defvar main (lambda () 0)))
        '((main (function (int 32)) "main"))
