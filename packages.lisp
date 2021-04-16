@@ -38,12 +38,13 @@
            #:call #:callee #:args
            #:literal
            #:reference #:name
-           #:bind
+           #:bind #:binding #:bindings
            #:with #:initialize
            #:primitive
            #:case #:adt-def #:clauses #:case!p
            #:case-clause #:variables
-           #:construct))
+           #:construct
+           #:unknown))
 
 (defpackage #:hare
   (:use #:cl)

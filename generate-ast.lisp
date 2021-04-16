@@ -56,13 +56,22 @@
   (convert-seq rest env type-env))
 
 (defmethod convert-special ((operator (eql 'let)) rest env type-env)
-  (destructuring-bind ((varname value) &rest body) rest
-    (let* ((lvar (ast:make-variable varname))
-           (info (make-instance 'variable-info :variable lvar))
-           (new-env (make-env (list varname) (list info) env)))
-      (make-instance 'ast:bind
-        :variable lvar :value (convert value env type-env)
-        :body (convert-seq body new-env type-env)))))
+  (destructuring-bind (bindings &rest body) rest
+    (multiple-value-bind (bindings varnames infos)
+        (loop for (varname value) in bindings
+              for lvar = (ast:make-variable varname)
+              for info = (make-instance 'variable-info :variable lvar)
+              for cval = (convert value env type-env)
+              for binding = (make-instance 'ast:binding
+                              :variable lvar :value cval)
+              collect varname into varnames
+              collect info into infos
+              collect binding into bindings
+              finally (return (values bindings varnames infos)))
+      (let ((new-env (make-env varnames infos env)))
+        (make-instance 'ast:bind
+          :bindings bindings
+          :body (convert-seq body new-env type-env))))))
 
 (defmethod convert-special ((operator (eql 'with)) rest env type-env)
   (destructuring-bind ((var nelements) &rest body)

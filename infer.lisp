@@ -325,20 +325,26 @@
                      (compose-inferences (list* finf igninf)))))
 
 (defmethod infer ((ast ast:bind) tenv)
-  (let* ((value (ast:value ast))
-         (ivalue (infer value tenv))
-         (valt (ast:type value))
-         (new-tenv (subst-tenv (tysubst ivalue) tenv))
-         #+polymorphic-local
-         (valsc (generalize new-tenv valt))
-         #-polymorphic-local
-         (valsc (type:schema valt))
-         (variable (ast:variable ast))
-         (new-tenv (extend-tenv variable valsc new-tenv))
+  (let* ((bindings (ast:bindings ast))
+         (variables (mapcar #'ast:variable bindings))
+         (values (mapcar #'ast:value bindings))
+         (ivalues (infer-list values tenv))
+         (i (compose-inferences ivalues))
+         (new-tenv
+           (loop with ntenv = (subst-tenv (tysubst i) tenv)
+                 for var in variables
+                 for value in values
+                 for valt = (ast:type value)
+                 ;; the VALUES is only here for indenting the #+#-.
+                 for valsc
+                   = (values #+polymorphic-local(generalize ntenv valt)
+                             #-polymorphic-local(type:schema valt))
+                 do (setf ntenv (extend-tenv var valsc ntenv))
+                 finally (return ntenv)))
          (body (ast:body ast))
          (ibody (infer body new-tenv)))
     (setf (ast:type ast) (ast:type body))
-    (inference-sans (compose-inferences/2 ivalue ibody) (list variable))))
+    (inference-sans (compose-inferences/2 i ibody) variables)))
 
 (defmethod infer ((ast ast:with) tenv)
   (let* ((ninf (infer (ast:nelements ast) tenv))

@@ -364,10 +364,17 @@ Return an LLVMValueRef for the result, or NIL if there isn't one
   (lookup (ast:variable ast) env))
 
 (defmethod translate-ast ((ast ast:bind) env)
-  (let* ((value (translate-ast (ast:value ast) env))
-         (_ (unless value (return-from translate-ast nil)))
-         (new-env (augment env (list (cons (ast:variable ast) value)))))
-    (declare (ignore _))
+  (let* ((bindings (ast:bindings ast))
+         (values (loop for binding in bindings
+                       for ast = (ast:value binding)
+                       for res = (translate-ast ast env)
+                       if res
+                         collect res
+                       else do (return-from translate-ast nil)))
+         (new-env (augment env (loop for binding in bindings
+                                     for value in values
+                                     for var = (ast:variable binding)
+                                     collect (cons var value)))))
     (translate-ast (ast:body ast) new-env)))
 
 ;;;

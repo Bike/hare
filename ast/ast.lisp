@@ -5,7 +5,7 @@
 A form is either
  * A symbol, referring to either a local variable or a global thing
  * A cons
-   * (let (symbol form) form*) binds a local variable
+   * (let ((symbol form)*) form*) binds local variables
    * (seq form*): progn
    * (case form ((constructor var*) form*)*) deconstructs an ADT value.
      Like Haskell. If form isn't typed to a sized ADT, type error.
@@ -121,18 +121,25 @@ A form is either
 (defmethod map-ast (function (ast reference))
   (make-instance 'reference :variable (variable ast) :type (type ast)))
 
-;; LET with one variable
-(defclass bind (ast)
+(defclass binding ()
   ((%variable :initarg :variable :accessor variable :type variable)
-   (%value :initarg :value :accessor value :type ast)
+   (%value :initarg :value :accessor value :type value)))
+
+;; LET
+(defclass bind (ast)
+  (;; A proper list of BINDINGs
+   (%bindings :initarg :bindings :accessor bindings :type list)
    (%body :initarg :body :accessor body :type ast)))
 (defmethod mapnil-ast (function (ast bind))
-  (mapnil-ast function (value ast))
+  (loop for binding in (bindings ast)
+        do (mapnil-ast function (value binding)))
   (mapnil-ast function (body ast)))
 (defmethod map-ast (function (ast bind))
   (make-instance 'bind
-    :variable (variable ast)
-    :value (map-ast function (value ast))
+    :bindings (loop for binding in (bindings ast)
+                    collect (make-instance 'binding
+                              :variable (variable binding)
+                              :value (map-ast function (value binding))))
     :body (map-ast function (body ast)) :type (type ast)))
 
 ;;; This is the primitive form of the WITH operator. It allocates a byte array
@@ -220,3 +227,8 @@ A form is either
 (defmethod map-ast (function (ast construct))
   :constructor (constructor ast)
   :args (map-asts function (args ast)) :type (type ast))
+
+;;; This is a pseudo-AST marking a parse failure, e.g. due to whether something
+;;; is a macro being unknown. It will be change-class'd into a real AST.
+(defclass unknown (ast)
+  ((%form :initarg :form :accessor form)))
