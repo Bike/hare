@@ -1,0 +1,43 @@
+ * Refactor modules (in progress)
+   * Reduce messy side effectual bullshit in phase0parse
+   * Allow partial parsing of ASTs etc
+   * Serialize/deserialize
+   * Compose modules together
+   * Distinct "manifesto" object (list of things to manifest)
+ * Implement INITIALIZE operator in backend
+ * Parsing from file
+   * Separate module and manifesto files, probably?
+   * Source info (use Eclector/CST)
+ * Language
+   * extern declarations (monotyped and not)
+   * variadic functions
+   * variadic templates
+   * FIGURE OUT DO NOTATION - monads could be a game changer
+   * do ad-hoc polymorphism properly
+     * system automatically determines which definition to use
+     * needs to be a way to show which overload is used, for debugging
+   * macro system?
+     * could allow using the language in non-lisp hosts, or at least non-CL hosts
+     * would be good to have a macro system that deals with source locations
+       * (unlike CL, but like Racket)
+   * hints concerning functions, e.g. inline
+   * hints concerning variables, e.g. restrict
+   * hints concerning representation, e.g. tagged pointers, alignment, packing
+     * would like to allow (defadt (object (array byte) header)) to work,
+       i.e. the pointer passed around is to the bytes, and to get the header
+       subtraction must be done - since bytes are accessed more
+   * ability to define object representation (byte sequence)
+     * could probably be represented as a distinct pointer type
+   * ability to define ABI? extremely machine dependent though...
+   * atomics
+   * continuations
+ * Output object files
+   * Does LLVM-C support this? In C++ you use addPassesToEmitFile
+ * Compile in Lisp image
+   * "JIT" except it's not an optimization thing, it's a development thing
+   * Construct objects in Lisp and pass them to Hare functions and receive results
+ * New backends
+   * Pickings look slim... and I don't want to write an x86 code generator
+   * GNU Lightning looks reasonably stable, but ISA seems overly complicated
+     * Possibly look at Guile's "Lightening"
+   * https://github.com/vnmakarov/mir not stable, but looks interesting

@@ -66,27 +66,6 @@ C defines things in terms of translation phases so let's do that. Unlike C, we s
 
 Text format is not really specified so far. I would especially like to be able to produce an object file without any actual starting text, i.e. producing in-memory AST structures by whatever means. Text is not really an efficient way to deal with programs, and also I don't want to deal with encodings very much.
 
-To-do list
-----------
-
-Ideally it should work.
-
-Also, add:
-
-1. extern declarations: this pointer will be linked in and have this type
-2. compiler hints concerning functions, such as: inline
-3. hints concerning variables, such as: restrict?
-3. hints concerning representation of types, such as: tagged pointers, alignment, packing
-4. ABI definition
-5. atomic operations
-6. continuations
-
-Things I would like to work:
-
-1. the language
-2. (defadt immediate (o) (fixnum (int 64)) (object (pointer o))) = tagged pointer
-3. (defadt object () (object (array byte) header)) = pointers to objects are pointers to the bytes, since they're more often used, and the machine subtracts to get the header
-
 Language design questions
 -------------------------
 
