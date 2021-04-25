@@ -18,7 +18,7 @@
                      (bindings tenv))))
 
 (defun lookup-type (key tenv)
-  (or (cdr (assoc key (bindings tenv) :test #'type:type=))
+  (or (cdr (assoc key (bindings tenv) :test #'eq))
       (error "Unbound: ~s" key)))
 
 (defun restrict-tenv (key tenv)

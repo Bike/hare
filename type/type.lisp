@@ -53,10 +53,10 @@ constants are integers with the given n's.
 ;;; Given a type, return a sexp representation for display.
 (defgeneric unparse-type (type))
 
-;;; Determine is types are equal.
-(defun type= (t1 t2)
-  ;; Thanks, caching!
-  (eq t1 t2))
+(defgeneric type= (type1 type2)
+  (:method ((t1 type) (t2 type)) nil) ; default
+  (:method :around ((t1 type) (t2 type)) ; optimization
+    (or (eq t1 t2) (call-next-method))))
 
 (defmethod print-object ((o type) s)
   (print-unreadable-object (o s)
@@ -83,6 +83,8 @@ constants are integers with the given n's.
 (defun make-int (len)
   (or (cached-int len)
       (setf (cached-int len) (make-instance 'int :length len))))
+(defmethod type= ((t1 int) (t2 int))
+  (= (int-type-length t1) (int-type-length t2)))
 (defmethod mapnil-type (function (type int)) (declare (ignore function)))
 (defmethod map-type (function (type int))
   (declare (ignore function))
@@ -96,6 +98,8 @@ constants are integers with the given n's.
 (defun make-pointer (ty)
   (or (cached-pointer ty)
       (setf (cached-pointer ty) (make-instance 'pointer :under ty))))
+(defmethod type= ((t1 pointer) (t2 pointer))
+  (type= (pointer-type-underlying t1) (pointer-type-underlying t2)))
 (defmethod map-type (function (type pointer))
   (make-pointer (map-type function (pointer-type-underlying type))))
 (defmethod mapnil-type (function (type pointer))
@@ -113,6 +117,10 @@ constants are integers with the given n's.
     (or (cached-fun key)
         (setf (cached-fun key) (make-instance 'fun
                                  :return ret :params params)))))
+(defmethod type= ((t1 fun) (t2 fun))
+  (and (type= (fun-return t1) (fun-return t2))
+       (= (length (parameters t1)) (length (parameters t2)))
+       (every #'type= (parameters t1) (parameters t2))))
 (defmethod map-type (function (type fun))
   (make-fun (map-type function (fun-return type))
             (loop for param in (parameters type)
@@ -130,6 +138,8 @@ constants are integers with the given n's.
 (defun make-arrayt (ty)
   (or (cached-array ty)
       (setf (cached-array ty) (make-instance 'arrayt :et ty))))
+(defmethod type= ((t1 arrayt) (t2 arrayt))
+  (type= (arrayt-element-type t1) (arrayt-element-type t2)))
 (defmethod map-type (function (type arrayt))
   (make-arrayt (map-type function (arrayt-element-type type))))
 (defmethod mapnil-type (function (type arrayt))

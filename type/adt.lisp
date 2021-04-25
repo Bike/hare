@@ -32,6 +32,10 @@
   (let ((key (list* def args)))
     (or (cached-adt key)
         (setf (cached-adt key) (make-instance 'adt :def def :args args)))))
+(defmethod type= ((t1 adt) (t2 adt))
+  (and (eq (adt-def t1) (adt-def t2))
+       ;; adt defs are the same, so the arglists have the same length.
+       (every #'type= (adt-args t1) (adt-args t2))))
 (defmethod map-type (function (type adt))
   (make-adt (adt-def type)
             (loop for ty in (adt-args type)
