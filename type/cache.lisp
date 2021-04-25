@@ -28,7 +28,6 @@
 (defvar *type-cache*)
 
 (defmacro with-type-cache ((&key (cache nil cache-p)) &body body)
-  (declare (ignore options)) ; for future expansion
   `(let ((*type-cache* ,(if cache-p
                             cache
                             `(if (boundp '*type-cache*)

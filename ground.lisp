@@ -13,4 +13,4 @@
 (defparameter *ground* (make-ground-env))
 
 ;;; Shield the ground environment from modification.
-(defun make-stdenv () (make-env nil nil *ground*))
+(defun make-stdenv () (make-global-env nil nil *ground*))

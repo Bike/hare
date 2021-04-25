@@ -34,29 +34,71 @@ a list of values (i.e. variables or initializers), and optionally a parent env.
 (defclass special-operator-info (info) ())
 
 (defclass environment ()
-  (;; An alist.
+  ((%parent :accessor parent :initarg :parent :type (or environment null))
+   ;; An alist.
    (%bindings :accessor bindings :initarg :bindings :type list)))
 
-(defun lookup (name environment)
-  (let ((pair (assoc name (bindings environment) :test #'eq)))
-    (if pair
-        (cdr pair)
-        (error 'variable-unbound :name name))))
+(defgeneric parent (environment)) ; an environment or NIL
 
-(defun forgiving-lookup (name environment)
-  (cdr (assoc name (bindings environment) :test #'eq)))
+(defclass global-environment (environment)
+  ((%parent :initform nil)))
+(defclass lexical-environment (environment)
+  ((%parent :type environment)))
 
-(defun (setf lookup) (new name environment)
-  (let ((pair (assoc name (bindings environment) :test #'eq)))
+;;; Get the global environment from an environment.
+(defgeneric global-environment (environment))
+(defmethod global-environment ((env global-environment)) env)
+(defmethod global-environment ((env lexical-environment))
+  (global-environment (parent env)))
+
+;;; Given an environment, return a copy with the specified global environment.
+;;; This is used in relation to the lexical environments stored in unparsed
+;;; ASTs.
+(defgeneric rehome-environment (environment global))
+(defmethod rehome-environment ((env global-environment)
+                               (global global-environment))
+  global)
+(defmethod rehome-environment ((env lexical-environment)
+                               (global global-environment))
+  (make-env (mapcar #'car (bindings env))
+            (mapcar #'cdr (bindings env))
+            (rehome-environment (parent env) global)))
+
+;;; Given an environment, return a copy with an empty global environment.
+;;; This is used for storing lexical environments in unparsed ASTs.
+(defun lexical-environment (environment)
+  (rehome-environment environment (make-env nil nil)))
+
+(defgeneric lookup (name environment)
+  (:argument-precedence-order environment name))
+
+(defmethod lookup (name (env global-environment))
+  (or (cdr (assoc name (bindings env) :test #'eq))
+      (let ((parent (parent env)))
+        (when parent (lookup name parent)))))
+(defmethod lookup (name (env lexical-environment))
+  (or (cdr (assoc name (bindings env) :test #'eq)) (lookup name (parent env))))
+
+(defgeneric (setf lookup) (new name environment)
+  (:argument-precedence-order environment name new))
+
+(defmethod (setf lookup) (new name (env global-environment))
+  (let ((pair (assoc name (bindings env) :test #'eq)))
     (if pair
         (setf (cdr pair) new)
-        (push (cons name new) (bindings environment))))
+        (push (cons name new) (bindings env))))
   new)
 
 (defun make-env (names values &optional parent)
-  (let ((parent-bindings (if parent (bindings parent) nil)))
-    (make-instance 'environment
-      :bindings (nconc (mapcar #'cons names values) parent-bindings))))
+  (if parent
+      (make-instance 'lexical-environment
+        :bindings (mapcar #'cons names values) :parent parent)
+      (make-instance 'global-environment
+        :bindings (mapcar #'cons names values))))
+
+(defun make-global-env (names values &optional parent)
+  (make-instance 'global-environment
+    :bindings (mapcar #'cons names values) :parent parent))
 
 (defun map-env (function env)
   (loop for (name . info) in (bindings env) do (funcall function name info)))

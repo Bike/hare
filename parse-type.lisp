@@ -10,8 +10,15 @@
                   (second alias))
            ;; "foo" can be short for "(foo)"
            (let ((adt-def (find-adt-def expr type-env)))
-             (assert (zerop (type:arity adt-def)))
-             (type:make-adt adt-def nil)))))
+             (cond (adt-def
+                    (assert (zerop (type:arity adt-def)))
+                    (type:make-adt adt-def nil))
+                   (t (let ((ph (make-instance 'type:unknown
+                                  :form expr
+                                  :type-env (lexical-type-env type-env))))
+                        (restart-case
+                            (error 'unknown-type :name expr :placeholder ph)
+                          (continue () ph)))))))))
     (cons
      (cl:case (car expr)
        ((int)
@@ -40,5 +47,18 @@
                  (type:make-tysubst (mapcar #'cons (first alias) rest))
                  (second alias)))
               (let ((adt-def (find-adt-def (car expr) type-env)))
-                (assert (= (type:arity adt-def) (length rest)))
-                (type:make-adt adt-def rest)))))))))
+                (cond (adt-def
+                       (assert (= (type:arity adt-def) (length rest)))
+                       (type:make-adt adt-def rest))
+                      (t (let ((ph (make-instance 'type:unknown
+                                     :form expr
+                                     :type-env (lexical-type-env type-env))))
+                           (restart-case
+                               (error 'unknown-type :name (car expr)
+                                                    :placeholder ph)
+                             (continue () ph)))))))))))))
+
+(defun reparse-type (unty type-env)
+  (check-type unty type:unknown)
+  (let ((type-env (rehome-type-env (type:type-env unty) type-env)))
+    (type:transform-unknown unty (parse-type (type:expr unty) type-env))))

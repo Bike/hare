@@ -227,8 +227,3 @@ A form is either
 (defmethod map-ast (function (ast construct))
   :constructor (constructor ast)
   :args (map-asts function (args ast)) :type (type ast))
-
-;;; This is a pseudo-AST marking a parse failure, e.g. due to whether something
-;;; is a macro being unknown. It will be change-class'd into a real AST.
-(defclass unknown (ast)
-  ((%form :initarg :form :accessor form)))

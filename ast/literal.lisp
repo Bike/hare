@@ -23,14 +23,12 @@
 ;;;  * undef
 ;;;  * (array initializer*) where the initializers are of uniform type.
 ;;;  * (arrayn n) where n is an integer constant. Short for an array of length
-;;;    n where all elements are undef.
+;;;    n where all elements are undef. This will be defined as a macro.
 ;;;  * (lambda (symbol*) form*) is a function.
 ;;;  * (vla form) is an array with a length defined at runtime by the form,
 ;;;    which must evaluate to an integer. All elements are undef.
 ;;;    This initializer is only permitted within a function, i.e. is not
 ;;;    allowed at top level.
-;;;  * (bytes initializer) indicates a byte vector where the bytes are taken
-;;;    from the object representation corresponding to the initializer.
 ;;;
 ;;; Literals and initializers may be polymorphically typed.
 ;;; Integer constants may be instantiated as any integer type that can fit

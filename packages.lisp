@@ -9,6 +9,7 @@
            #:arrayt #:arrayt-element-type #:make-arrayt
            #:adt-def #:name #:tvars #:constructors #:members #:arity
            #:tvar #:name #:make-tvar
+           #:unknown #:expr #:type-env #:transform-unknown
            #:adt #:adt-args #:constructor #:fields #:make-adt #:inert)
   (:export #:mapnil-type #:map-type)
   (:export #:schema #:free #:free-in-schema #:instantiate)
@@ -31,7 +32,9 @@
            #:undef-initializer #:undef
            #:lambda-initializer #:params #:body
            #:array-initializer #:elements
-           #:vla-initializer #:nelements)
+           #:vla-initializer #:nelements
+           #:unknown-initializer #:expr #:environment
+           #:transform-unknown-initializer)
   (:export #:ast
            #:mapnil-ast #:map-ast #:copy-ast
            #:seq #:asts
@@ -44,7 +47,7 @@
            #:case #:adt-def #:clauses #:case!p
            #:case-clause #:variables
            #:construct
-           #:unknown))
+           #:unknown #:transform-unknown))
 
 (defpackage #:hare
   (:use #:cl)

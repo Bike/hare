@@ -12,34 +12,51 @@ and ADD-TYPE modify one.
 (defclass type-env ()
   (;; Type aliases. List of (name (tvar*) type)
    (%aliases :initform nil :initarg :aliases
-             :accessor aliases :type list)
-   ;; ADTs
+             :accessor aliases :type list)))
+(defclass global-type-env (type-env)
+  (;; ADTs
    (%by-name :initform (make-hash-table :test #'eq) :initarg :by-name
              :accessor by-name :type hash-table)
    (%by-constructor :initform (make-hash-table :test #'eq)
                     :initarg :by-constructor
                     :accessor by-constructor :type hash-table)))
+(defclass lexical-type-env (type-env)
+  ((%parent :initarg :parent :type type-env)))
+(defgeneric global-type-env (type-env))
+(defmethod global-type-env ((te global-type-env)) te)
+(defmethod global-type-env ((te lexical-type-env))
+  (global-type-env (parent te)))
+(defgeneric rehome-type-env (type-env global))
+(defmethod rehome-type-env ((te global-type-env) (g global-type-env)) g)
+(defmethod rehome-type-env ((te lexical-type-env) (g global-type-env))
+  (make-instance 'lexical-type-env :aliases (aliases te)
+                 :parent (rehome-type-env (parent te) g)))
+(defun lexical-type-env (type-env) (rehome-type-env type-env (make-type-env)))
 
-(defun find-alias (name type-env)
-  (values (cdr (assoc name (aliases type-env)))))
+(defgeneric find-alias (name type-env)
+  (:argument-precedence-order type-env name))
+
+(defmethod find-alias (name (te global-type-env))
+  (cdr (assoc name (aliases te))))
+(defmethod find-alias (name (te lexical-type-env))
+  (or (cdr (assoc name (aliases te)))
+      (find-alias name (parent te))))
 
 (defun add-alias (name params expansion type-env)
-  (push (list name params expansion) type-env))
+  (push (list name params expansion) (aliases type-env)))
 
 (defun find-adt-def (name type-env)
-  (or (gethash name (by-name type-env)) (error 'unknown-adt :name name)))
+  (gethash name (by-name (global-type-env type-env))))
 
 (defun find-constructor (constructor-name type-env)
-  (or (gethash constructor-name (by-constructor type-env))
-      (error 'unknown-constructor :name constructor-name)))
+  (gethash constructor-name (by-constructor (global-type-env type-env))))
 
-(defun make-type-env () (make-instance 'type-env))
+(defun make-type-env () (make-instance 'global-type-env))
 
 ;; Return a new type-env with additional name->type mapping.
 (defun augment-type-env (type-env aliases)
-  (make-instance 'type-env
-    :by-name (by-name type-env) :by-constructor (by-constructor type-env)
-    :aliases (append aliases (aliases type-env))))
+  (make-instance 'lexical-type-env
+    :parent type-env :aliases aliases))
 
 ;; Add an adt-def that may only have its name to the environment.
 (defun add-adt-def (adt-def type-env)

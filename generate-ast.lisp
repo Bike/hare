@@ -20,6 +20,13 @@
   (let ((cl (convertlis list env type-env)))
     (make-instance 'ast:seq :asts (butlast cl) :value (first (last cl)))))
 
+(defun conversion-missing-name (name form env)
+  (let ((ast (make-instance 'ast:unknown
+               :expr form :env (lexical-environment env))))
+    (restart-case
+        (error 'unknown-variable :name name :placeholder ast)
+      (continue () ast))))
+
 (defun convert-symbol (symbol env type-env)
   (let ((info (lookup symbol env)))
     (etypecase info
@@ -27,7 +34,8 @@
       (constant-info
        (make-instance 'ast:literal :initializer (initializer info)))
       (symbol-macro-info
-       (convert (funcall (expander info) symbol env) env type-env)))))
+       (convert (funcall (expander info) symbol env) env type-env))
+      (null (conversion-missing-name symbol symbol env)))))
 
 (defun convert-cons (head args env type-env)
   (if (symbolp head)
@@ -44,7 +52,8 @@
            (convert (funcall (expander info) (cons head args) env)
                     env type-env))
           (special-operator-info
-           (convert-special head args env type-env))))
+           (convert-special head args env type-env))
+          (null (conversion-missing-name head (cons head args) env))))
       ;; ordinary function call with complex evaluation of the function
       (make-instance 'ast:call
         :callee (convert head env type-env)
@@ -91,7 +100,9 @@
       :initializer (parse-initializer init env type-env))))
 
 (defun convert-clause (constructor-name varnames bodyforms env type-env)
-  (let* ((constructor (find-constructor constructor-name type-env))
+  (let* ((constructor
+           (or (find-constructor constructor-name type-env)
+               (return-from convert-clause nil)))
          (variables (loop for varname in varnames
                           collect (ast:make-variable varname)))
          (var-infos (loop for variable in variables
@@ -108,7 +119,20 @@
       (error "Empty case"))
     (let* ((clauses
              (loop for ((cname . vars) . body) in clauses
-                   collect (convert-clause cname vars body env type-env)))
+                   for clause = (convert-clause cname vars body env type-env)
+                   ;; FIXME: Demanding that the whole form be reparsed is not
+                   ;; really necessary - the subforms are totally parseable.
+                   ;; Better would be to make clauses with unknown constructors
+                   ;; that can be filled in later.
+                   when clause collect clause
+                     else do (let ((ast (make-instance 'ast:unknown
+                                          :form (cons head args)
+                                          :env (lexical-environment env))))
+                               (restart-case
+                                   (error 'unknown-constructor
+                                          :name cname :placeholder ast)
+                                 (continue ()
+                                   (return-from convert-case ast))))))
            (adt-def (type:adt-def (ast:constructor (first clauses)))))
       (assert (loop for clause in (rest clauses)
                     always (eq adt-def
@@ -137,12 +161,21 @@
 (defmethod convert-special ((operator (eql 'quote)) args env type-env)
   (destructuring-bind (spec) args
     (make-instance 'ast:literal
-      ;; FIXME: Should be a global env
-      :initializer (parse-literal spec env type-env))))
+      :initializer (parse-literal spec (global-environment env) type-env))))
 
 (defun convert-literal (form env type-env)
   (make-instance 'ast:literal
-    :initializer (parse-literal form env type-env)))
+    :initializer (parse-literal form (global-environment env) type-env)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Having another go at ASTs we gave up on (because new stuff has been defined)
+;;;
+
+(defun reparse-ast (unknown env type-env)
+  (check-type unknown ast:unknown)
+  (let ((env (rehome-environment (ast:environment unknown) env)))
+    (ast:transform-unknown unknown (convert (ast:expr unknown) env type-env))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -154,19 +187,27 @@
     ((integer 0) (make-instance 'ast:integer-initializer :value literal))
     ((or (cons (member array arrayn bytes lambda)) (eql undef))
      (error "Found initializer in literal context: ~a" literal))
-    (symbol (lookup literal env))
+    #+(or)
+    (symbol) ; actually not sure about semantics here yet
     (cons ; constructor
      (let* ((cname (car literal)) (fields (cdr literal))
             (constructor (find-constructor cname type-env)))
-       (make-instance 'ast:constructor-initializer
-         :constructor constructor
-         :fields (loop for field in fields
-                       collect (parse-literal field env type-env)))))))
+       (if constructor
+           (make-instance 'ast:constructor-initializer
+             :constructor constructor
+             :fields (loop for field in fields
+                           collect (parse-literal field env type-env)))
+           (let ((i (make-instance 'ast:unknown-initializer
+                      :form literal :env (lexical-environment env))))
+             (restart-case
+                 (error 'unknown-constructor :name cname :placeholder i)
+               (continue () i))))))))
 
 (defun parse-initializer (initializer env type-env)
   (etypecase initializer
     ((integer 0) (make-instance 'ast:integer-initializer :value initializer))
     ((eql undef) (ast:undef))
+    #+(or)
     (symbol
      (make-instance 'ast:variable-initializer
        :variable (lookup initializer env)))
@@ -178,15 +219,19 @@
     ((cons (eql vla))
      (make-instance 'ast:vla-initializer
        :nelements (convert (second initializer) env type-env)))
-    ((cons (member arrayn bytes))
-     (error "Not implemented yet: ~a" (car initializer)))
     (cons ; constructor
      (let* ((cname (car initializer)) (fields (cdr initializer))
             (constructor (find-constructor cname type-env)))
-       (make-instance 'ast:constructor-initializer
-         :constructor constructor
-         :fields (loop for field in fields
-                       collect (parse-initializer field env type-env)))))))
+       (if constructor
+           (make-instance 'ast:constructor-initializer
+             :constructor constructor
+             :fields (loop for field in fields
+                           collect (parse-initializer field env type-env)))
+           (let ((i (make-instance 'ast:unknown-initializer
+                      :form initializer :env (lexical-environment env))))
+             (restart-case
+                 (error 'unknown-constructor :name cname :placeholder i)
+               (continue () i))))))))
 
 (defun parse-lambda (params forms env type-env)
   (let* ((vars (mapcar #'ast:make-variable params))
@@ -201,3 +246,17 @@
   (make-instance 'ast:array-initializer
     :elements (loop for elementf in elementfs
                     collect (parse-initializer elementf env type-env))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+;;; Having another go at initializers
+;;; FIXME: We don't have a separate reparse-literal, so we could end up with
+;;; initializers where literals are needed, in badly formed code
+;;;
+
+(defun reparse-initializer (uninit env type-env)
+  (check-type uninit ast:unknown-initializer)
+  (let ((env (rehome-environment (ast:environment uninit) env)))
+    (ast:transform-unknown-initializer
+     uninit
+     (parse-initializer (ast:expr uninit) env type-env))))

@@ -155,4 +155,8 @@ constants are integers with the given n's.
                type)
   t)
 
+;;; Pseudo-type used when parsing failed.
+(defclass unknown (type)
+  ((%form :initarg :form :accessor form)))
+
 ;;; For algebraic data types, see adt.lisp. They're a little more complicated.

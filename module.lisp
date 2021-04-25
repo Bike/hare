@@ -15,7 +15,7 @@
    (%inference :initarg :inference :reader inference :type inference)))
 
 (defun module (pre-module)
-  (assert (null (toplevels pre-module)))
+  (assert (completep pre-module))
   (type:with-type-cache ()
     (let* ((varbinds (varbinds pre-module))
            (env (environment pre-module))
