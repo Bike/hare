@@ -1,6 +1,6 @@
- * Refactor modules (in progress)
-   * Reduce messy side effectual bullshit in phase0parse
-   * Allow partial parsing of ASTs etc
+ * Refactor modules [in progress]
+   * Reduce messy side effectual bullshit in phase0parse [done]
+   * Allow partial parsing of ASTs etc [done, except not tested]
    * Serialize/deserialize
    * Compose modules together
    * Distinct "manifesto" object (list of things to manifest)
@@ -10,6 +10,7 @@
    * Source info (use Eclector/CST)
  * Language
    * extern declarations (monotyped and not)
+   * iteration (tagbody)
    * variadic functions
    * variadic templates
    * FIGURE OUT DO NOTATION - monads could be a game changer
